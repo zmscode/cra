@@ -245,7 +245,7 @@ struct SidebarTopBar: View {
 			}
 		}
 		.frame(height: 36)
-		.background(shape.fill(hoverPill ? palette.selectedFill : palette.pillFill))
+		.background(shape.fill(palette.raised(hoverPill ? palette.selectedFill : palette.pillFill)))
 		.contentShape(shape)
 		.onHover { hoverPill = $0 }
 		.animation(.easeOut(duration: 0.15), value: hoverHeader)
@@ -301,7 +301,7 @@ private struct PillImageButton: View {
 			.frame(width: 28, height: 28)
 			.background(
 				RoundedRectangle(cornerRadius: 7, style: .continuous).fill(
-					hover ? palette.hoverFill : .clear))
+					palette.raised(hover ? palette.hoverFill : .clear)))
 		}
 		.buttonStyle(.plain)
 		.onHover { hover = $0 }
@@ -348,7 +348,7 @@ struct SidebarIconButton: View {
 				.frame(width: size, height: height ?? min(size, 28))
 				.background(
 					RoundedRectangle(cornerRadius: 7, style: .continuous).fill(
-						hover && enabled ? palette.hoverFill : .clear))
+						palette.raised(hover && enabled ? palette.hoverFill : .clear)))
 		}
 		.buttonStyle(.plain)
 		.disabled(!enabled)
@@ -605,7 +605,7 @@ struct SpaceHeader: View {
 			.frame(height: 31)
 			.background(
 				RoundedRectangle(cornerRadius: 8).fill(
-					hover && hasPinned ? palette.hoverFill : .clear)
+					palette.raised(hover && hasPinned ? palette.hoverFill : .clear))
 			)
 			.contentShape(Rectangle())
 		}
@@ -651,7 +651,7 @@ struct NewTabRow: View {
 			.frame(height: CraMetrics.rowHeight)
 			.background(
 				RoundedRectangle(cornerRadius: CraMetrics.rowCorner, style: .continuous).fill(
-					hover ? palette.selectedFill : .clear)
+					palette.raised(hover ? palette.selectedFill : .clear))
 			)
 			.contentShape(Rectangle())
 		}

@@ -340,7 +340,7 @@ private struct LibraryArchiveRow: View {
 			.frame(height: 52)
 			.background(
 				RoundedRectangle(cornerRadius: 10, style: .continuous).fill(
-					hover ? palette.hoverFill : .clear)
+					palette.raised(hover ? palette.hoverFill : .clear))
 			)
 			.contentShape(Rectangle())
 		}
@@ -400,7 +400,7 @@ private struct LibraryDownloadRow: View {
 			.frame(height: 52)
 			.background(
 				RoundedRectangle(cornerRadius: 10, style: .continuous).fill(
-					hover ? palette.hoverFill : .clear)
+					palette.raised(hover ? palette.hoverFill : .clear))
 			)
 			.contentShape(Rectangle())
 		}

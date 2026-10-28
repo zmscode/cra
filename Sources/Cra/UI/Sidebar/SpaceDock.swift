@@ -230,7 +230,7 @@ struct SpaceDockButton: View {
 
 	/// Arc's hovered/pressed cell on a dark space: white at ~7.8% (39,33,51 over 21,14,34), 6 pt corners.
 	private var cellFill: Color {
-		palette.ink(palette.isDark ? .white.opacity(0.078) : .black.opacity(0.05))
+		palette.isDark ? .white.opacity(0.078) : .black.opacity(0.05)
 	}
 
 	var body: some View {
@@ -241,7 +241,7 @@ struct SpaceDockButton: View {
 			.saturation(selected || hovered || pressed ? 1 : 0.2)
 			.background(
 				RoundedRectangle(cornerRadius: 6).fill(
-					targeted || hovered || pressed ? cellFill : .clear)
+					palette.raised(targeted || hovered || pressed ? cellFill : .clear))
 			)
 			.contentShape(Rectangle())
 			.arcTooltip(space.title)
@@ -318,7 +318,7 @@ struct LibraryButton: View {
 			.frame(width: 28, height: 28)
 			.background(
 				RoundedRectangle(cornerRadius: 7, style: .continuous).fill(
-					hover ? palette.hoverFill : .clear))
+					palette.raised(hover ? palette.hoverFill : .clear)))
 		}
 		.buttonStyle(.plain)
 		.onHover {

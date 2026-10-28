@@ -133,7 +133,7 @@ struct LiveFolderStatusRow: View {
 				.padding(.vertical, 8)
 				.background(
 					RoundedRectangle(cornerRadius: CraMetrics.rowCorner, style: .continuous)
-						.fill(message.url != nil && hover ? palette.hoverFill : .clear)
+						.fill(palette.raised(message.url != nil && hover ? palette.hoverFill : .clear))
 				)
 				.contentShape(Rectangle())
 				.onHover { hover = $0 }

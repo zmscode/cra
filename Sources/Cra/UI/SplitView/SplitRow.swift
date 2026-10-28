@@ -39,7 +39,7 @@ struct SplitRow: View {
 		.frame(height: CraMetrics.rowHeight)
 		.background(
 			RoundedRectangle(cornerRadius: CraMetrics.rowCorner, style: .continuous)
-				.fill(selected ? palette.selectedFill : (hover ? palette.hoverFill : .clear))
+				.fill(palette.raised(selected ? palette.selectedFill : (hover ? palette.hoverFill : .clear)))
 				.shadow(
 					color: selected && !palette.isDark ? .black.opacity(0.06) : .clear, radius: 3,
 					y: 1)

@@ -99,7 +99,7 @@ struct FavoriteCell: View {
 				RoundedRectangle(cornerRadius: 13)
 					// Arc 1.170 over white: tile 207/194/166, hovered tile 197/184/158 (another ~4.5% black on top of the tile fill).
 					.fill(
-						palette.ink(
+						palette.raised(
 							selected
 								? (palette.isDark
 									? Color.white.opacity(0.13) : Color.white.opacity(0.38))

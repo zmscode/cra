@@ -47,9 +47,9 @@ struct SpacePalette {
 		LinearGradient(colors: gradientColors, startPoint: .top, endPoint: .bottom)
 	}
 
-	/// The palette with its translucent text and fills blended over the space's colour, so
+	/// The palette with its translucent text and lines blended over the space's colour, so
 	/// they stay solid on a see-through window (Settings ▸ Window transparency) instead of
-	/// letting the desktop through.
+	/// letting the desktop through. Hover, selection and pill fills keep their translucency.
 	func solidified() -> SpacePalette {
 		let stops = gradientColors.compactMap { NSColor($0).usingColorSpace(.sRGB) }
 		let n = CGFloat(max(1, stops.count))
@@ -61,8 +61,8 @@ struct SpacePalette {
 		return SpacePalette(
 			isDark: isDark, gradientColors: gradientColors, textPrimary: solid(textPrimary),
 			textSecondary: solid(textSecondary), textTertiary: solid(textTertiary),
-			hoverFill: solid(hoverFill), selectedFill: solid(selectedFill),
-			separator: solid(separator), pillFill: solid(pillFill), toolbarFill: toolbarFill,
+			hoverFill: hoverFill, selectedFill: selectedFill,
+			separator: solid(separator), pillFill: pillFill, toolbarFill: toolbarFill,
 			folderTint: solid(folderTint), folderFill: solid(folderFill),
 			commandHighlight: commandHighlight, noise: noise, gradientAlpha: gradientAlpha,
 			gradientAlphaBottom: gradientAlphaBottom, vibrant: vibrant, solidBase: base)
@@ -73,6 +73,25 @@ struct SpacePalette {
 	func ink(_ c: Color) -> Color {
 		guard let solidBase else { return c }
 		return Self.blend(c, over: solidBase)
+	}
+
+	/// A hover/selection fill with a little depth: a touch of light along its top fading to
+	/// the fill a shade lighter at the bottom, instead of one flat tone. Clear stays clear.
+	func raised(_ c: Color) -> LinearGradient {
+		guard let x = NSColor(c).usingColorSpace(.sRGB), x.alphaComponent > 0.001 else {
+			return LinearGradient(colors: [.clear], startPoint: .top, endPoint: .bottom)
+		}
+		let a = x.alphaComponent
+		let w: CGFloat = isDark ? 0.05 : 0.12
+		let top = w + a * (1 - w)
+		func lit(_ v: CGFloat) -> Double { Double((w + a * (1 - w) * v) / top) }
+		return LinearGradient(
+			colors: [
+				Color(
+					.sRGB, red: lit(x.redComponent), green: lit(x.greenComponent),
+					blue: lit(x.blueComponent), opacity: Double(top)),
+				c.opacity(0.8),
+			], startPoint: .top, endPoint: .bottom)
 	}
 
 	private static func blend(_ c: Color, over base: (r: CGFloat, g: CGFloat, b: CGFloat)) -> Color {

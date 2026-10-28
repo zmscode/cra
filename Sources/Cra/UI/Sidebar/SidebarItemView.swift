@@ -210,7 +210,7 @@ struct TabRow: View {
 		.frame(height: CraMetrics.rowHeight)
 		.background(
 			RoundedRectangle(cornerRadius: CraMetrics.rowCorner, style: .continuous)
-				.fill(highlighted ? palette.selectedFill : (hover ? palette.hoverFill : .clear))
+				.fill(palette.raised(highlighted ? palette.selectedFill : (hover ? palette.hoverFill : .clear)))
 				.shadow(
 					color: highlighted && !palette.isDark ? .black.opacity(0.06) : .clear,
 					radius: 3, y: 1)
@@ -432,7 +432,7 @@ struct FolderRow: View {
 		.frame(height: CraMetrics.rowHeight)
 		.background(
 			RoundedRectangle(cornerRadius: CraMetrics.rowCorner, style: .continuous).fill(
-				hover ? palette.hoverFill : .clear)
+				palette.raised(hover ? palette.hoverFill : .clear))
 		)
 		.contentShape(Rectangle())
 		.onHover {
