@@ -1925,6 +1925,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, BrowserM
 
 	func showSpaceEditor(space: Space?) {
 		guard let window else { return }
+		// Editing another space switches to it first, so its theme previews in the window.
+		if let space, space.id != store.focusedSpaceID(window: windowID) {
+			store.focusSpace(space.id, window: windowID)
+		}
 		let panel = NSPanel(
 			contentRect: NSRect(x: 0, y: 0, width: 520, height: 520), styleMask: [.titled],
 			backing: .buffered, defer: false)
@@ -1940,7 +1944,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, BrowserM
 					self.store.updateSpace(s)
 					id = s.id
 				} else {
-					id = self.store.createSpace(title: title, emoji: "", symbol: symbol, theme: theme).id
+					id =
+						self.store.createSpace(
+							title: title, emoji: "", symbol: symbol, theme: theme
+						).id
 				}
 				switch profile {
 				case .existing(let p): self.store.setProfile(p, forSpace: id)
@@ -1948,8 +1955,23 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, BrowserM
 					self.store.setProfile(self.store.createProfile(name: newName).id, forSpace: id)
 				}
 				if let panel { window.endSheet(panel) }
-			}, onCancel: { [weak panel] in if let panel { window.endSheet(panel) } })
-		panel.contentView = NSHostingView(rootView: view)
+			},
+			onCancel: { [weak self, weak panel] in
+				// Undo the live preview.
+				if let self, let space, var s = self.store.spaces[space.id] {
+					s.theme = space.theme
+					self.store.updateSpace(s)
+				}
+				if let panel { window.endSheet(panel) }
+			},
+			onPreview: { [weak self] theme in
+				guard let self, let space, var s = self.store.spaces[space.id] else { return }
+				s.theme = theme
+				self.store.updateSpace(s)
+			})
+		let host = NSHostingView(rootView: view)
+		panel.contentView = host
+		panel.setContentSize(host.fittingSize)
 		spaceEditor = panel
 		window.beginSheet(panel) { [weak self] _ in self?.spaceEditor = nil }
 	}

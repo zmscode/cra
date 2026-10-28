@@ -14,21 +14,22 @@ struct SpaceEditorView: View {
 	/// Title, symbol, theme, profile; a new profile comes with its name.
 	let onSave: (String, String, SpaceTheme, SpaceProfileChoice, String) -> Void
 	let onCancel: () -> Void
+	/// Every theme change while editing, so the window can show it live.
+	var onPreview: (SpaceTheme) -> Void = { _ in }
 
 	@State private var title: String
 	@State private var symbol: String
 	@State private var customSymbol = ""
 	@State private var theme: SpaceTheme
-	@State private var color1: Color
-	@State private var color2: Color
 	@State private var profile: SpaceProfileChoice
 	@State private var newProfileName = ""
 
 	init(
 		existing: Space?, profiles: [BrowserProfile],
 		onSave: @escaping (String, String, SpaceTheme, SpaceProfileChoice, String) -> Void,
-		onCancel: @escaping () -> Void
+		onCancel: @escaping () -> Void, onPreview: @escaping (SpaceTheme) -> Void = { _ in }
 	) {
+		self.onPreview = onPreview
 		self.existing = existing
 		self.profiles = profiles
 		_profile = State(initialValue: .existing(existing?.profileID))
@@ -38,10 +39,6 @@ struct SpaceEditorView: View {
 		_title = State(initialValue: existing?.title ?? "")
 		_symbol = State(initialValue: existing?.symbolName ?? Space.defaultSymbol)
 		_theme = State(initialValue: t)
-		_color1 = State(initialValue: Color(hex: t.colors.first ?? "#CCCCCC"))
-		_color2 = State(
-			initialValue: Color(
-				hex: t.colors.count > 1 ? t.colors[1] : (t.colors.first ?? "#CCCCCC")))
 	}
 
 	var body: some View {
@@ -53,7 +50,8 @@ struct SpaceEditorView: View {
 				ZStack {
 					SpaceBackground(palette: theme.palette)
 					VStack(spacing: 6) {
-						SpaceIcon(symbol: symbol, size: 28).foregroundStyle(theme.palette.textPrimary)
+						SpaceIcon(symbol: symbol, size: 28).foregroundStyle(
+							theme.palette.textPrimary)
 						Text(title.isEmpty ? "Space" : title).font(
 							.system(size: 13, weight: .semibold)
 						).foregroundStyle(theme.palette.textPrimary)
@@ -86,47 +84,20 @@ struct SpaceEditorView: View {
 					}
 					HStack {
 						Text("Symbol name").font(.system(size: 11)).foregroundStyle(.secondary)
-						TextField("e.g. sparkles", text: $customSymbol).textFieldStyle(.roundedBorder)
-							.onChange(of: customSymbol) { _, v in
-								if let name = Space.validSymbol(v.trimmingCharacters(in: .whitespaces)) {
-									symbol = name
-								}
+						TextField("e.g. sparkles", text: $customSymbol).textFieldStyle(
+							.roundedBorder
+						)
+						.onChange(of: customSymbol) { _, v in
+							if let name = Space.validSymbol(v.trimmingCharacters(in: .whitespaces))
+							{
+								symbol = name
 							}
+						}
 					}
 				}
 			}
 			Divider()
-			VStack(alignment: .leading, spacing: 8) {
-				HStack(spacing: 6) {
-					ForEach(SpaceTheme.presets.indices, id: \.self) { i in
-						let p = SpaceTheme.presets[i]
-						Circle().fill(p.palette.gradient).frame(width: 26, height: 26)
-							.overlay(Circle().strokeBorder(Color.primary.opacity(0.15)))
-							.onTapGesture {
-								theme = p
-								color1 = Color(hex: p.colors[0])
-								color2 = Color(hex: p.colors[1])
-							}
-					}
-					Spacer()
-					ColorPicker("", selection: $color1, supportsOpacity: false).labelsHidden()
-					ColorPicker("", selection: $color2, supportsOpacity: false).labelsHidden()
-				}
-				HStack {
-					Text("Intensity").frame(width: 70, alignment: .leading)
-					Slider(value: $theme.intensity, in: 0...1)
-				}
-				HStack {
-					Text("Grain").frame(width: 70, alignment: .leading)
-					Slider(value: $theme.noise, in: 0...1)
-				}
-				Picker("Appearance", selection: $theme.appearance) {
-					Text("Auto").tag("auto")
-					Text("Light").tag("light")
-					Text("Dark").tag("dark")
-				}
-				.pickerStyle(.segmented)
-			}
+			SpaceLookPicker(theme: $theme)
 			Divider()
 			profileSection
 			HStack {
@@ -145,8 +116,7 @@ struct SpaceEditorView: View {
 		}
 		.padding(20)
 		.frame(width: 520)
-		.onChange(of: color1) { _, c in theme.colors = [c.hexString, color2.hexString] }
-		.onChange(of: color2) { _, c in theme.colors = [color1.hexString, c.hexString] }
+		.onChange(of: theme) { _, t in onPreview(t) }
 	}
 
 	private var trimmedProfileName: String { newProfileName.trimmingCharacters(in: .whitespaces) }
