@@ -31,6 +31,11 @@ struct SidebarListDrop: Equatable {
 	/// The rows on either side of the line, nudged apart.
 	var rowAbove: UUID?
 	var rowBelow: UUID?
+	/// Reordering within one list: the dragged row lifts out (hidden, the rows after it close
+	/// up) and the rows from the drop point on slide down to open a gap where it lands. How far
+	/// each row moves; no line then.
+	var shifts: [UUID: CGFloat] = [:]
+	var liftsDragged = false
 }
 
 /// Scrolls a space's list while a drag hovers near its top or bottom edge.
@@ -115,8 +120,10 @@ final class DragAutoscroller {
 /// against the rows' frames itself on every move.
 struct SidebarListDropDelegate: DropDelegate {
 	static let coordinateSpace = "sidebarList"
-	static let nudge: CGFloat = 3
-	static let animation = Animation.snappy(duration: 0.2, extraBounce: 0)
+	static let nudge: CGFloat = 6
+	/// How long a drag rests on the middle of a tab before dropping would combine with it.
+	static let combineDelay: TimeInterval = 0.5
+	static let animation = Animation.spring(response: 0.28, dampingFraction: 0.86)
 
 	let space: Space
 	let store: SidebarStore
@@ -126,14 +133,6 @@ struct SidebarListDropDelegate: DropDelegate {
 	func validateDrop(info: DropInfo) -> Bool { info.hasItemsConforming(to: [.craSidebarItem]) }
 
 	func dropEntered(info: DropInfo) {
-		// Rows here set draggingID when the drag starts; a drag from another
-		// window only says what it carries through the pasteboard.
-		if let provider = info.itemProviders(for: [.craSidebarItem]).first {
-			_ = provider.loadTransferable(type: SidebarDragItem.self) { [ui] result in
-				guard case .success(let d) = result else { return }
-				DispatchQueue.main.async { ui.draggingID = d.id }
-			}
-		}
 		update(info)
 	}
 
@@ -144,12 +143,30 @@ struct SidebarListDropDelegate: DropDelegate {
 
 	func dropExited(info: DropInfo) {
 		autoscroller.stop()
+		ui.dragRest = nil
 		withAnimation(Self.animation) { ui.listDrop = nil }
 	}
 
 	func performDrop(info: DropInfo) -> Bool {
 		autoscroller.stop()
-		guard let id = ui.draggingID, store.item(id) != nil else { return false }
+		defer { ui.dragRest = nil }
+		guard let id = ui.draggingID, store.item(id) != nil else {
+			// Rows here set draggingID when the drag starts; a drag from another window only
+			// says what it carries through the pasteboard, which is readable only now: asked
+			// for while the drag was still moving, AppKit threw and the list never updated.
+			guard let provider = info.itemProviders(for: [.craSidebarItem]).first else {
+				return false
+			}
+			let location = info.location
+			_ = provider.loadTransferable(type: SidebarDragItem.self) { [self] result in
+				guard case .success(let d) = result else { return }
+				DispatchQueue.main.async {
+					guard store.item(d.id) != nil else { return }
+					withAnimation(Self.animation) { apply(resolve(dragged: d.id, at: location)) }
+				}
+			}
+			return true
+		}
 		let drop = ui.listDrop ?? resolve(dragged: id, at: info.location)
 		withAnimation(Self.animation) {
 			ui.listDrop = nil
@@ -166,6 +183,7 @@ struct SidebarListDropDelegate: DropDelegate {
 
 	private func update(_ info: DropInfo) {
 		autoscroller.update()
+		ui.dragLocation = info.location
 		guard let id = ui.draggingID, store.item(id) != nil else { return }
 		let drop = resolve(dragged: id, at: info.location)
 		guard drop != ui.listDrop else { return }
@@ -243,6 +261,39 @@ struct SidebarListDropDelegate: DropDelegate {
 		return out
 	}
 
+	/// What resting on a tab or split row makes: a split row takes a pane, a Today tab makes a
+	/// split (the dragged tab on the side of the row it hovers), a pinned tab a new folder. A
+	/// live folder's tabs make no new folders.
+	private func combineTarget(_ r: Row, at p: CGPoint) -> SidebarListDrop.Target? {
+		if r.item.isSplit { return .into(r.item.id) }
+		if isInside(r.item.id, space.todayContainerID) {
+			return .split(with: r.item.id, leading: p.x < r.frame.midX)
+		}
+		if store.item(r.parent)?.isLiveFolder == true { return nil }
+		return .newFolder(with: r.item.id)
+	}
+
+	/// Whether the drag has rested on the middle of `id` long enough to combine. A new rest
+	/// starts the clock and re-checks when it runs out, since a still pointer sends no updates.
+	private func rested(on id: UUID) -> Bool {
+		if let rest = ui.dragRest, rest.id == id {
+			return Date().timeIntervalSince(rest.since) >= Self.combineDelay
+		}
+		ui.dragRest = (id, Date())
+		DispatchQueue.main.asyncAfter(deadline: .now() + Self.combineDelay + 0.02) { [self] in
+			guard ui.dragRest?.id == id, let p = ui.dragLocation, let dragged = ui.draggingID,
+				store.item(dragged) != nil
+			else { return }
+			let drop = resolve(dragged: dragged, at: p)
+			guard drop != ui.listDrop else { return }
+			withAnimation(Self.animation) { ui.listDrop = drop }
+			if store.settings.hapticFeedbackOnReorder, drop.target != nil {
+				NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+			}
+		}
+		return false
+	}
+
 	private func isInside(_ id: UUID, _ ancestor: UUID) -> Bool {
 		var cur = store.item(id)?.parentID
 		var hops = 0
@@ -254,16 +305,38 @@ struct SidebarListDropDelegate: DropDelegate {
 		return false
 	}
 
-	/// Top and bottom quarters of a row insert before/after it; the middle
-	/// combines: a folder takes the item, a Today tab makes a split (the
-	/// dragged tab goes on the side of the row it hovers), a pinned tab makes
-	/// a new folder, a split row takes a pane.
+	/// The top half of a row inserts before it, the bottom half after: dragging reorders.
+	/// Resting on the middle of a tab for `combineDelay` combines instead: a Today tab makes a
+	/// split (the dragged tab goes on the side of the row it hovers), a pinned tab a new folder,
+	/// a split row takes a pane. A folder's middle takes the item at once.
 	func resolve(dragged id: UUID, at p: CGPoint) -> SidebarListDrop {
 		let rows = visibleRows()
 		let group = ui.group(for: id, in: store)
 		let isTab = store.item(id)?.isTab == true
 		let half = CraMetrics.rowSpacing / 2
 		var target: SidebarListDrop.Target?
+
+		// While a gap is open the rows sit where they slid to: resting on a row means resting
+		// where it's drawn, and combining keeps the rows there instead of snapping them back.
+		let gap = ui.listDrop?.liftsDragged == true ? ui.listDrop?.shifts : nil
+		if let gap, isTab, group.count == 1 {
+			if let r = rows.first(where: { r in
+				guard r.item.id != id, r.item.isTab || r.item.isSplit else { return false }
+				let top = r.frame.minY + (gap[r.item.id] ?? 0)
+				return (0.25..<0.75).contains((p.y - top) / max(1, r.frame.height))
+			}) {
+				if rested(on: r.item.id) {
+					var drop = SidebarListDrop(draggedID: id, target: combineTarget(r, at: p))
+					if drop.target != nil {
+						drop.shifts = gap
+						drop.liftsDragged = true
+						return drop
+					}
+				}
+			} else {
+				ui.dragRest = nil
+			}
+		}
 
 		if let r = rows.first(where: { p.y >= $0.frame.minY - half && p.y < $0.frame.maxY + half })
 		{
@@ -282,14 +355,14 @@ struct SidebarListDropDelegate: DropDelegate {
 				} else {
 					target = .into(r.item.id)
 				}
-			} else if middle && isTab && r.item.isTab {
-				target =
-					isInside(r.item.id, space.todayContainerID)
-					? .split(with: r.item.id, leading: p.x < r.frame.midX)
-					: .newFolder(with: r.item.id)
-			} else if middle && isTab && r.item.isSplit {
-				target = .into(r.item.id)
+			} else if gap == nil, middle && isTab && (r.item.isTab || r.item.isSplit),
+				rested(on: r.item.id)
+			{
+				target = combineTarget(r, at: p)
 			} else {
+				if gap == nil, !(middle && isTab && (r.item.isTab || r.item.isSplit)) {
+					ui.dragRest = nil
+				}
 				target = f < 0.5 ? before : after
 			}
 		} else {
@@ -354,6 +427,22 @@ struct SidebarListDropDelegate: DropDelegate {
 			maxX: section.maxX - 6)
 		drop.rowAbove = rows.last { $0.frame.maxY <= y + 1 }?.item.id
 		drop.rowBelow = rows.first { $0.frame.minY >= y - 1 }?.item.id
+		// One tab moving within its own list: lift it out and open a gap at the drop point.
+		// Hit testing keeps using the rows' resting frames, so the sliding never feeds back.
+		if group.count == 1, isTab, store.item(id)?.parentID == parent,
+			let from = rows.firstIndex(where: { $0.item.id == id })
+		{
+			let h = rows[from].frame.height + CraMetrics.rowSpacing
+			let gapAt = rows.firstIndex { $0.frame.minY >= y - 1 } ?? rows.count
+			for (j, r) in rows.enumerated() where j != from {
+				let d = (j > from ? -h : 0) + (j >= gapAt ? h : 0)
+				if d != 0 { drop.shifts[r.item.id] = d }
+			}
+			drop.liftsDragged = true
+			drop.line = nil
+			drop.rowAbove = nil
+			drop.rowBelow = nil
+		}
 		return drop
 	}
 }
@@ -373,9 +462,10 @@ struct SidebarDropPreview: ViewModifier {
 	func body(content: Content) -> some View {
 		let drop = ui.listDrop
 		let nudge: CGFloat =
-			drop?.rowAbove == id
-			? -SidebarListDropDelegate.nudge
-			: (drop?.rowBelow == id ? SidebarListDropDelegate.nudge : 0)
+			drop?.shifts[id]
+			?? (drop?.rowAbove == id
+				? -SidebarListDropDelegate.nudge
+				: (drop?.rowBelow == id ? SidebarListDropDelegate.nudge : 0))
 		let badge = badge(for: drop?.target)
 		let combine = combine(for: drop)
 		content
@@ -411,7 +501,9 @@ struct SidebarDropPreview: ViewModifier {
 						.allowsHitTesting(false)
 				}
 			}
-			.opacity(combine != nil ? 0 : (drop.map { isDragged($0.draggedID) } ?? false ? 0.4 : 1))
+			.opacity(
+				combine != nil || (drop?.liftsDragged == true && drop?.draggedID == id)
+					? 0 : (drop.map { isDragged($0.draggedID) } ?? false ? 0.4 : 1))
 			.overlay {
 				if let combine, let target = store.item(id),
 					let dragged = store.item(combine.dragged)
@@ -602,3 +694,4 @@ struct CombineDropPreview: View {
 			)
 	}
 }
+

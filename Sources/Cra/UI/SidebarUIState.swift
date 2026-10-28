@@ -11,6 +11,11 @@ final class SidebarUIState {
 	@ObservationIgnored var windowID = UUID()
 	var renamingID: UUID?
 	var draggingID: UUID?
+	/// The row a drag is resting on the middle of, and since when: combining with it (a split
+	/// or a new folder) waits for the drag to rest there (SidebarListDropDelegate).
+	@ObservationIgnored var dragRest: (id: UUID, since: Date)?
+	/// Where the drag last was over the list, to re-check once a rest has lasted.
+	@ObservationIgnored var dragLocation: CGPoint?
 	var hoveredTabID: UUID?
 	/// Loading progress per tab (0...1), fed by the browser manager.
 	var progress: [UUID: Double] = [:]
@@ -202,6 +207,8 @@ final class SidebarActions {
 	var runExtension: (String) -> Void = { _ in }
 	/// Toolbar Extensions button: the extensions menu, under the pointer.
 	var showExtensionsMenu: () -> Void = {}
+	/// The tab's last screenshot (the tab switcher's thumbnail), for its drag preview.
+	var tabSnapshot: (UUID) -> NSImage? = { _ in nil }
 }
 
 private struct SidebarActionsKey: EnvironmentKey {

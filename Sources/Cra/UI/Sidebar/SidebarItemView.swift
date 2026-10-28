@@ -242,21 +242,37 @@ struct TabRow: View {
 			}
 		}
 		.draggable(SidebarDragItem.begin(item.id, session)) {
-			// Dragging one of several picked tabs moves them all.
-			HStack(spacing: 8) {
-				FaviconView(key: tab.iconKey, palette: palette)
-				Text(item.displayTitle).font(.system(size: 14)).lineLimit(1)
-				if closeGroup.count > 1 {
-					Text("\(closeGroup.count)")
-						.font(.system(size: 11, weight: .semibold))
-						.foregroundStyle(.white)
-						.padding(.horizontal, 6)
-						.frame(minWidth: 18, minHeight: 18)
-						.background(Capsule().fill(Color.accentColor))
+			// The page's last screenshot over its title; dragging one of several picked tabs
+			// moves them all.
+			VStack(alignment: .leading, spacing: 6) {
+				if let shot = actions.tabSnapshot(item.id) {
+					Image(nsImage: shot)
+						.resizable()
+						.aspectRatio(contentMode: .fill)
+						.frame(width: 200, height: 133)
+						.clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+						.overlay(
+							RoundedRectangle(cornerRadius: 6, style: .continuous)
+								.strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
 				}
+				HStack(spacing: 8) {
+					FaviconView(key: tab.iconKey, palette: palette)
+					Text(item.displayTitle).font(.system(size: 13)).lineLimit(1)
+					Spacer(minLength: 0)
+					if closeGroup.count > 1 {
+						Text("\(closeGroup.count)")
+							.font(.system(size: 11, weight: .semibold))
+							.foregroundStyle(.white)
+							.padding(.horizontal, 6)
+							.frame(minWidth: 18, minHeight: 18)
+							.background(Capsule().fill(Color.accentColor))
+					}
+				}
+				.padding(.horizontal, 2)
 			}
-			.padding(8)
-			.background(RoundedRectangle(cornerRadius: 8).fill(.regularMaterial))
+			.frame(width: 200)
+			.padding(6)
+			.background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.regularMaterial))
 		}
 		.iconMenu(palette: palette, enabled: { !editing }) {
 			closeGroup.count > 1 ? groupMenuItems : menuItems

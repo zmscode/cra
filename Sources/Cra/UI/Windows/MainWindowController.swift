@@ -267,6 +267,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, BrowserM
 			default: break
 			}
 		}
+		sidebarActions.tabSnapshot = { [weak self] id in self?.browsers.runtime(for: id)?.snapshot }
 		sidebarActions.editPaneURL = { [weak self] id in
 			guard let self else { return }
 			if self.selectedTabID != id { self.store.selectTab(id, window: windowID) }
