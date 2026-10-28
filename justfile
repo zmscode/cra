@@ -73,9 +73,10 @@ upstream-status: upstream-fetch
 upstream-diff: upstream-fetch
     git diff HEAD...{{upstream_branch}}
 
-# Merge upstream into the current branch
-upstream-merge: upstream-fetch
-    git merge {{upstream_branch}}
+# Merge upstream into the current branch, both sides formatted alike first so only real
+# changes conflict (see scripts/upstream-merge.sh)
+upstream-merge:
+    scripts/upstream-merge.sh {{upstream_branch}}
 
 # Merge upstream, then push to your fork
 upstream-sync: upstream-merge
