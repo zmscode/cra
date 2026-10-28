@@ -259,6 +259,17 @@ struct TabRow: View {
 			.background(RoundedRectangle(cornerRadius: 8).fill(.regularMaterial))
 		}
 		.contextMenu { contextMenu }
+		// One tab: the icon menu (TabActionMenu) instead of the system menu above, which
+		// still serves several picked tabs.
+		.overlay(
+			RightClickCatcher(enabled: { closeGroup.count == 1 && !editing }) {
+				TabActionMenu.show(
+					AnyView(
+						TabActionMenuView(item: item, pinned: pinned, navigatedAway: navigatedAway)
+							.environment(store).environment(ui)
+							.environment(\.sidebarActions, actions)),
+					dark: palette.isDark)
+			})
 		// Arc's row tip is the tab's title by the pointer; the close buttons' own tips win over it.
 		// Like Arc (didShowRenameHint), "Double-click to rename" rides along once.
 		.arcTooltip(
