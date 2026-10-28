@@ -92,7 +92,7 @@ struct SpaceLookPicker: View {
 	// MARK: Presets
 
 	private var swatches: some View {
-		let presets = SpaceTheme.presets
+		let presets = SpaceTheme.allPresets
 		let pages = max(1, Int(ceil(Double(presets.count) / Double(Self.swatchesPerPage))))
 		let start = presetPage * Self.swatchesPerPage
 		let shown = Array(presets[start..<min(presets.count, start + Self.swatchesPerPage)])

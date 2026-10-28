@@ -265,6 +265,51 @@ struct SpaceTheme: Codable, Equatable {
 			colors: ["#F4F1EA", "#E6DCC8"], intensity: 0.6, noise: 0.15, appearance: "light"),  // Parchment
 	]
 
+	/// More colours for the Look picker (Edit Space ▸ Look). Onboarding and new spaces keep to
+	/// `presets`: onboarding lays its swatches out in one row.
+	static let morePresets: [SpaceTheme] = [
+		SpaceTheme(
+			colors: ["#0E1626", "#1F3A68"], intensity: 0.8, noise: 0.18, appearance: "dark"),  // Midnight
+		SpaceTheme(
+			colors: ["#101633", "#2F4FBF"], intensity: 0.75, noise: 0.16, appearance: "dark"),  // Cobalt
+		SpaceTheme(
+			colors: ["#0B1E24", "#1F6E7A"], intensity: 0.75, noise: 0.18, appearance: "dark"),  // Deep teal
+		SpaceTheme(
+			colors: ["#0F1A12", "#2E5233"], intensity: 0.8, noise: 0.2, appearance: "dark"),  // Forest
+		SpaceTheme(
+			colors: ["#1A1F26", "#3E4A5A"], intensity: 0.85, noise: 0.14, appearance: "dark"),  // Slate
+		SpaceTheme(
+			colors: ["#1E1020", "#6B2E5F"], intensity: 0.75, noise: 0.18, appearance: "dark"),  // Plum
+		SpaceTheme(
+			colors: ["#1F0E12", "#7A2333"], intensity: 0.75, noise: 0.2, appearance: "dark"),  // Wine
+		SpaceTheme(
+			colors: ["#24141C", "#8E3B5C"], intensity: 0.7, noise: 0.18, appearance: "dark"),  // Rose dusk
+		SpaceTheme(
+			colors: ["#CDE7FF", "#E8F4FF"], intensity: 0.55, noise: 0.12, appearance: "light"),  // Sky
+		SpaceTheme(
+			colors: ["#B9F0EE", "#E0FBFF"], intensity: 0.5, noise: 0.12, appearance: "light"),  // Aqua
+		SpaceTheme(
+			colors: ["#CFF5E1", "#EFFFF6"], intensity: 0.55, noise: 0.12, appearance: "light"),  // Mint
+		SpaceTheme(
+			colors: ["#D6E2CF", "#EEF3EA"], intensity: 0.6, noise: 0.15, appearance: "light"),  // Sage
+		SpaceTheme(
+			colors: ["#E3D7FF", "#F4EEFF"], intensity: 0.55, noise: 0.12, appearance: "light"),  // Lavender
+		SpaceTheme(
+			colors: ["#A8C0FF", "#E2D1FF"], intensity: 0.5, noise: 0.12, appearance: "light"),  // Periwinkle
+		SpaceTheme(
+			colors: ["#FFD1DC", "#FFEFF3"], intensity: 0.55, noise: 0.12, appearance: "light"),  // Rose
+		SpaceTheme(
+			colors: ["#FFD8C2", "#FFEFE2"], intensity: 0.55, noise: 0.14, appearance: "light"),  // Peach
+		SpaceTheme(
+			colors: ["#FFB88C", "#FF9AAE"], intensity: 0.45, noise: 0.18, appearance: "light"),  // Sunset
+	]
+
+	/// Every preset the Look picker offers: the dark ones first, then the light ones.
+	static let allPresets: [SpaceTheme] = {
+		let all = presets + morePresets
+		return all.filter(\.isDark) + all.filter { !$0.isDark }
+	}()
+
 	/// Incognito windows: near-black with a cool violet cast, so they never pass for a space.
 	static let incognito = SpaceTheme(
 		colors: ["#141318", "#2B2638"], intensity: 0.9, noise: 0.14, appearance: "dark")
