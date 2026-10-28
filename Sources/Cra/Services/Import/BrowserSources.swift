@@ -1,7 +1,7 @@
 import AppKit
 
 /// A browser the import can read: Dia's list (Arc, Brave, Chrome, Edge,
-/// Firefox, Opera, Opera GX, Safari) plus Dia itself, Vivaldi, Chromium and Zen.
+/// Firefox, Opera, Opera GX, Safari) plus Dia itself, Vivaldi, Chromium, Helium and Zen.
 struct ImportSource: Identifiable, Hashable {
 	enum Kind: Hashable {
 		/// Arc and Dia: their own sidebar stores, and a Chromium profile for passwords and cookies.
@@ -31,12 +31,13 @@ struct ImportSource: Identifiable, Hashable {
 	}
 
 	private static func chromium(
-		_ id: String, _ name: String, _ bundleID: String, _ path: String, account: String
+		_ id: String, _ name: String, _ bundleID: String, _ path: String, account: String,
+		service: String? = nil
 	) -> ImportSource {
 		ImportSource(
 			id: id, name: name, bundleID: bundleID, kind: .chromium,
 			dataDir: support.appendingPathComponent(path, isDirectory: true),
-			keychainService: "\(account) Safe Storage", keychainAccount: account)
+			keychainService: service ?? "\(account) Safe Storage", keychainAccount: account)
 	}
 
 	static let arc = ImportSource(
@@ -63,6 +64,10 @@ struct ImportSource: Identifiable, Hashable {
 			account: "Opera GX"),
 		chromium("vivaldi", "Vivaldi", "com.vivaldi.Vivaldi", "Vivaldi", account: "Vivaldi"),
 		chromium("chromium", "Chromium", "org.chromium.Chromium", "Chromium", account: "Chromium"),
+		// Helium renames its Keychain item instead of using "<Name> Safe Storage".
+		chromium(
+			"helium", "Helium", "net.imput.helium", "net.imput.helium", account: "Helium",
+			service: "Helium Storage Key"),
 		ImportSource(
 			id: "firefox", name: "Firefox", bundleID: "org.mozilla.firefox", kind: .firefox,
 			dataDir: support.appendingPathComponent("Firefox", isDirectory: true)),

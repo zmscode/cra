@@ -13,6 +13,9 @@ struct TabsPane: View {
 				SettingsCheckbox(
 					title: "Add new tabs to the top", isOn: $store.settings.newTabsAtTop)
 				SettingsCheckbox(
+					title: "Show the New Tab button above tabs",
+					isOn: $store.settings.newTabButtonAtTop)
+				SettingsCheckbox(
 					title: "Haptic feedback when reordering tabs",
 					isOn: $store.settings.hapticFeedbackOnReorder)
 				SettingsCheckbox(

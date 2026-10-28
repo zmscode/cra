@@ -375,9 +375,12 @@ struct SidebarListDropDelegate: DropDelegate {
 					index: p.y < pinned.minY ? 0 : store.children(of: space.pinnedContainerID).count
 				)
 			} else {
+				// The New Tab row may lead Today, so its first tab, not the section, marks the top.
+				let firstToday =
+					rows.first { $0.parent == space.todayContainerID }?.frame.minY ?? today.minY
 				target = .insert(
 					parent: space.todayContainerID,
-					index: p.y < today.minY ? 0 : store.children(of: space.todayContainerID).count)
+					index: p.y < firstToday ? 0 : store.children(of: space.todayContainerID).count)
 			}
 		}
 
