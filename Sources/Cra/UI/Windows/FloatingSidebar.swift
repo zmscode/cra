@@ -29,7 +29,9 @@ final class FloatingSidebarController {
 	private var trafficLights: FloatingTrafficLights?
 
 	enum Metrics {
-		static let edge: CGFloat = 2
+		/// The trigger strip: the margin left of the card plus a little of the card, so the
+		/// pointer doesn't have to land on the 2 pt that is also the window's resize edge.
+		static let edge: CGFloat = CraMetrics.contentInset + 3
 		static let leaveSlack: CGFloat = 24
 		static let cornerRadius: CGFloat = 12
 		static let margin: CGFloat = 8
@@ -60,13 +62,19 @@ final class FloatingSidebarController {
 	}
 
 	private func pointerMoved() {
-		guard NSApp.isActive, !shell.contentFullscreen, window.isVisible else { return }
+		// Also while Cra is in the background, like hovering any other window's controls.
+		guard !shell.contentFullscreen, window.isVisible, !window.isMiniaturized else { return }
 		guard isShown || sidebarHidden() else { return }
 		let screenPoint = NSEvent.mouseLocation
 		let inWindow = window.frame.contains(screenPoint)
 		let p = window.convertPoint(fromScreen: screenPoint)
 		if !isShown {
 			guard sidebarHidden(), inWindow, p.x <= Metrics.edge else { return }
+			// In the background, only when no other app's window covers that edge.
+			if !NSApp.isActive {
+				let top = NSWindow.windowNumber(at: screenPoint, belowWindowWithWindowNumber: 0)
+				guard NSApp.window(withWindowNumber: top) != nil else { return }
+			}
 			show()
 		} else if !inWindow || p.x > shell.sidebarWidth + Metrics.margin + Metrics.leaveSlack {
 			hide(animated: true)

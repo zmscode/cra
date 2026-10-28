@@ -334,12 +334,19 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, BrowserM
 		// Vibrant themes see through to the desktop like Arc; others are opaque.
 		shell.vibrancy.isHidden = !palette.vibrant
 		shell.vibrancyLift.isHidden = !palette.vibrant
-		shell.vibrantDark = palette.isDark
+		// Only vibrant themes get the behind-window blur and lift; on any other theme they
+		// would sit, near-opaque, behind a see-through window.
+		shell.vibrantDark = palette.vibrant && palette.isDark
 		shell.vibrantLight = palette.vibrant && !palette.isDark
 		shell.refreshLift()
-		window?.isOpaque = !palette.vibrant
+		// Settings ▸ Appearance: the desktop shows through everything but the page. Full
+		// transparency keeps 18% of the space's gradient and grain, so its colour still reads.
+		let see = palette.vibrant ? 0 : min(1, max(0, store.settings.windowTransparency))
+		shell.backgroundHost.alphaValue = 1 - see * 0.82
+		let clear = palette.vibrant || see > 0
+		window?.isOpaque = !clear
 		window?.backgroundColor =
-			palette.vibrant ? .clear : NSColor(palette.gradientColors.first ?? .gray)
+			clear ? .clear : NSColor(palette.gradientColors.first ?? .gray)
 
 		browsers.pruneMissingTabs()
 		let selected = selectedTabID

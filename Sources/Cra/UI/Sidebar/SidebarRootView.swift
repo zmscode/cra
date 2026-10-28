@@ -568,8 +568,11 @@ struct SpaceHeader: View {
 	@State private var hover = false
 
 	private var collapsed: Bool { store.isPinnedCollapsed(space.id) }
+	/// Nothing pinned (no tabs, no folders): nothing to collapse, so the name is just a label.
+	private var hasPinned: Bool { !store.children(of: space.pinnedContainerID).isEmpty }
 
 	private func toggle() {
+		guard hasPinned else { return }
 		withAnimation(.easeInOut(duration: 0.25)) { store.togglePinnedCollapsed(space.id) }
 	}
 
@@ -586,19 +589,24 @@ struct SpaceHeader: View {
 					.font(.system(size: 8, weight: .bold))
 					.foregroundStyle(palette.textTertiary)
 					.rotationEffect(.degrees(collapsed ? -90 : 0))
-					.opacity(hover ? 1 : 0)
+					.opacity(hover && hasPinned ? 1 : 0)
 				Spacer()
 			}
 			.padding(.horizontal, 7)
 			.frame(height: 31)
-			.background(RoundedRectangle(cornerRadius: 8).fill(hover ? palette.hoverFill : .clear))
+			.background(
+				RoundedRectangle(cornerRadius: 8).fill(
+					hover && hasPinned ? palette.hoverFill : .clear)
+			)
 			.contentShape(Rectangle())
 		}
 		.buttonStyle(.plain)
 		.onHover { hover = $0 }
 		.contextMenu {
-			Button(collapsed ? "Expand Pinned Tabs" : "Collapse Pinned Tabs", action: toggle)
-			Divider()
+			if hasPinned {
+				Button(collapsed ? "Expand Pinned Tabs" : "Collapse Pinned Tabs", action: toggle)
+				Divider()
+			}
 			Button("Edit Space…") { actions.editSpace(space) }
 			Button("New Folder") { actions.performAction("newFolder") }
 			Button("New GitHub Live Folder") { actions.performAction("newGitHubLiveFolder") }

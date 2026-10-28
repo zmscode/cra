@@ -334,7 +334,8 @@ struct SidebarDocument: Codable {
 		let pinned = SidebarItem.container(.pinned(spaceID: spaceID))
 		let today = SidebarItem.container(.today(spaceID: spaceID))
 		let space = Space(
-			id: spaceID, title: "Personal", emoji: "🌱", symbol: "leaf", theme: SpaceTheme.presets[0],
+			id: spaceID, title: "Personal", emoji: "🌱", symbol: "leaf",
+			theme: SpaceTheme.presets[0],
 			favoritesContainerID: fav.id,
 			pinnedContainerID: pinned.id, todayContainerID: today.id, createdAt: Date())
 		return SidebarDocument(spaceOrder: [spaceID], spaces: [space], items: [fav, pinned, today])
@@ -466,6 +467,9 @@ struct AppSettings: Codable, Equatable {
 	var tabSleep: TabSleepThreshold = .oneHour
 	/// Privacy ▸ "Always use secure connections": Chrome's HTTPS-Only Mode.
 	var httpsOnly: Bool = false
+	/// General ▸ Appearance: how much of the desktop shows through the window around the
+	/// page, 0 (opaque) to 1. The space's colour and grain stay visible at 1; pages stay opaque.
+	var windowTransparency: Double = 0
 
 	init() {}
 
@@ -575,6 +579,8 @@ extension AppSettings {
 		tabSleepEnabled = try c.decodeIfPresent(Bool.self, forKey: .tabSleepEnabled) ?? false
 		tabSleep = (try? c.decodeIfPresent(TabSleepThreshold.self, forKey: .tabSleep)) ?? .oneHour
 		httpsOnly = try c.decodeIfPresent(Bool.self, forKey: .httpsOnly) ?? false
+		windowTransparency =
+			try c.decodeIfPresent(Double.self, forKey: .windowTransparency) ?? 0
 	}
 }
 

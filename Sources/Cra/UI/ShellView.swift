@@ -150,7 +150,9 @@ final class ShellView: NSView {
 			CATransaction.commit()
 		} else {
 			backdropHost.isHidden = true
-			vibrancyLift.isHidden = false
+			// The white lift is for vibrant themes only; on a see-through window (Settings ▸
+			// Window transparency) it would wash the colour out.
+			vibrancyLift.isHidden = !(vibrantLight || vibrantDark)
 			vibrancy.isHidden = !(vibrantLight || vibrantDark)
 		}
 		vibrancy.material = vibrantDark ? .underWindowBackground : t.material
@@ -828,7 +830,8 @@ final class ResizeHandleView: NSView {
 		for t in trackingAreas { removeTrackingArea(t) }
 		addTrackingArea(
 			NSTrackingArea(
-				rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+				rect: bounds,
+				options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
 				owner: self))
 	}
 

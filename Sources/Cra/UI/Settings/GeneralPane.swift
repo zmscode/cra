@@ -4,8 +4,10 @@ import SwiftUI
 /// default-browser prompt at the top of its Account pane): default browser, Dock, login.
 struct GeneralPane: View {
 	private let system = SystemIntegration.shared
+	@Environment(SidebarStore.self) private var store
 
 	var body: some View {
+		@Bindable var store = store
 		SettingsCardPane {
 			SettingsHeader("System")
 			SettingsCard {
@@ -59,6 +61,19 @@ struct GeneralPane: View {
 				SettingsFootnote("Cra works best as your default browser.")
 			}
 			if let error { SettingsFootnote(error).foregroundStyle(.red) }
+
+			SettingsHeader("Appearance")
+			SettingsCard {
+				SettingsCardRow {
+					Text("Window transparency").font(.system(size: 13))
+				} trailing: {
+					Slider(value: $store.settings.windowTransparency, in: 0...1)
+						.frame(width: 180)
+				}
+			}
+			SettingsFootnote(
+				"The desktop shows through the sidebar and around the page, still tinted with the space's colour and grain. Pages stay opaque."
+			)
 		}
 		.onAppear { system.refresh() }
 	}
