@@ -8,8 +8,15 @@ struct SidebarRootView: View {
 	@Environment(SidebarUIState.self) private var ui
 	@Environment(\.sidebarActions) private var actions
 
+	/// A space's palette as the sidebar draws it: solid on a see-through window, so text,
+	/// buttons and fills don't fade with the background.
+	private func sidebarPalette(_ space: Space) -> SpacePalette {
+		let p = space.theme.palette
+		return store.settings.windowTransparency > 0 && !p.vibrant ? p.solidified() : p
+	}
+
 	var body: some View {
-		let palette = store.focusedSpace(window: ui.windowID).theme.palette
+		let palette = sidebarPalette(store.focusedSpace(window: ui.windowID))
 		// The Library takes over the sidebar (LibraryView: in from a little to the left,
 		// out to the left while the tab list fades back in).
 		ZStack(alignment: .topLeading) {
@@ -29,7 +36,7 @@ struct SidebarRootView: View {
 
 	private var tabs: some View {
 		let space = store.focusedSpace(window: ui.windowID)
-		let palette = space.theme.palette
+		let palette = sidebarPalette(space)
 		return VStack(spacing: 0) {
 			SidebarTopBar(palette: palette)
 			// Dia's paging container: every space's list sits side by side and the
@@ -43,11 +50,11 @@ struct SidebarRootView: View {
 						// space's tab list scrolls (SpaceSectionView owns that scroll view).
 						// Favorites belong to the space, so they page with it.
 						VStack(spacing: 0) {
-							FavoritesGrid(space: s, palette: s.theme.palette)
+							FavoritesGrid(space: s, palette: sidebarPalette(s))
 								.padding(.horizontal, 8)
-							SpaceSectionView(space: s, palette: s.theme.palette)
+							SpaceSectionView(space: s, palette: sidebarPalette(s))
 						}
-						.foregroundStyle(s.theme.palette.textPrimary)
+						.foregroundStyle(sidebarPalette(s).textPrimary)
 						.frame(width: g.size.width, height: g.size.height, alignment: .top)
 					}
 				}
@@ -321,7 +328,9 @@ struct SidebarIconButton: View {
 	/// Arc 1.170 draws these glyphs at roughly 26% black (sidebar toggle, library, +) while the
 	/// app is in the background. With the app active its header glyphs darken to ~59% black;
 	/// disabled ones stay at ~24% (light theme, 26 Oct; the dark theme was not measured).
-	private var tint: Color {
+	private var tint: Color { palette.ink(rawTint) }
+
+	private var rawTint: Color {
 		if palette.isDark {
 			return enabled ? Color.white.opacity(0.55) : palette.textTertiary.opacity(0.55)
 		}

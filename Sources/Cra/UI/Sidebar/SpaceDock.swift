@@ -229,7 +229,9 @@ struct SpaceDockButton: View {
 	@State private var targeted = false
 
 	/// Arc's hovered/pressed cell on a dark space: white at ~7.8% (39,33,51 over 21,14,34), 6 pt corners.
-	private var cellFill: Color { palette.isDark ? .white.opacity(0.078) : .black.opacity(0.05) }
+	private var cellFill: Color {
+		palette.ink(palette.isDark ? .white.opacity(0.078) : .black.opacity(0.05))
+	}
 
 	var body: some View {
 		SpaceIcon(space, size: 13)
@@ -288,7 +290,7 @@ struct LibraryButton: View {
 	}
 
 	private var libraryGlyph: some View {
-		let ink = palette.isDark ? Color.white.opacity(0.55) : Color.black.opacity(0.26)
+		let ink = palette.ink(palette.isDark ? Color.white.opacity(0.55) : Color.black.opacity(0.26))
 		return Button(action: action) {
 			ZStack(alignment: .top) {
 				// Arc's box has no lid line: a 13×10 rounded box with a light slot near the top.

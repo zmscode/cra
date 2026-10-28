@@ -40,9 +40,48 @@ struct SpacePalette {
 	let gradientAlpha: Double
 	let gradientAlphaBottom: Double
 	let vibrant: Bool
+	/// Set by `solidified()`: the colour translucent ink is blended over.
+	var solidBase: (r: CGFloat, g: CGFloat, b: CGFloat)? = nil
 
 	var gradient: LinearGradient {
 		LinearGradient(colors: gradientColors, startPoint: .top, endPoint: .bottom)
+	}
+
+	/// The palette with its translucent text and fills blended over the space's colour, so
+	/// they stay solid on a see-through window (Settings ▸ Window transparency) instead of
+	/// letting the desktop through.
+	func solidified() -> SpacePalette {
+		let stops = gradientColors.compactMap { NSColor($0).usingColorSpace(.sRGB) }
+		let n = CGFloat(max(1, stops.count))
+		let base = (
+			r: stops.reduce(0) { $0 + $1.redComponent } / n,
+			g: stops.reduce(0) { $0 + $1.greenComponent } / n,
+			b: stops.reduce(0) { $0 + $1.blueComponent } / n)
+		func solid(_ c: Color) -> Color { Self.blend(c, over: base) }
+		return SpacePalette(
+			isDark: isDark, gradientColors: gradientColors, textPrimary: solid(textPrimary),
+			textSecondary: solid(textSecondary), textTertiary: solid(textTertiary),
+			hoverFill: solid(hoverFill), selectedFill: solid(selectedFill),
+			separator: solid(separator), pillFill: solid(pillFill), toolbarFill: toolbarFill,
+			folderTint: solid(folderTint), folderFill: solid(folderFill),
+			commandHighlight: commandHighlight, noise: noise, gradientAlpha: gradientAlpha,
+			gradientAlphaBottom: gradientAlphaBottom, vibrant: vibrant, solidBase: base)
+	}
+
+	/// A colour as this palette draws it: as given, or blended solid when `solidified()`.
+	/// For the sidebar's own translucent tints that aren't palette colours.
+	func ink(_ c: Color) -> Color {
+		guard let solidBase else { return c }
+		return Self.blend(c, over: solidBase)
+	}
+
+	private static func blend(_ c: Color, over base: (r: CGFloat, g: CGFloat, b: CGFloat)) -> Color {
+		guard let x = NSColor(c).usingColorSpace(.sRGB) else { return c }
+		let a = x.alphaComponent
+		return Color(
+			.sRGB, red: Double(x.redComponent * a + base.r * (1 - a)),
+			green: Double(x.greenComponent * a + base.g * (1 - a)),
+			blue: Double(x.blueComponent * a + base.b * (1 - a)), opacity: 1)
 	}
 
 	/// Outline and fill for a folder glyph; nil (Auto) is the theme's pair.
