@@ -5,7 +5,7 @@
 #include "include/cef_sandbox_mac.h"
 #include "include/wrapper/cef_library_loader.h"
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   // The seatbelt profile has to be in place before the framework loads.
   // libcef_sandbox.dylib ships inside the framework (Libraries/).
   CefScopedSandboxContext sandbox_context;

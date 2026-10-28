@@ -8,175 +8,221 @@ import CraCEF
 /// so Cra frames it in a window under its own button (Arc: right edges aligned, just below the bar).
 @MainActor
 final class ExtensionActions {
-    static let shared = ExtensionActions()
+	static let shared = ExtensionActions()
 
-    private struct CachedTab { weak var browser: CraBrowser?; let tabTarget: String }
-    /// Page browser → its "tab" target (triggerAction only accepts tab targets).
-    private var tabTargets: [ObjectIdentifier: CachedTab] = [:]
-    /// Tab session → callback with the page target that auto-attaches under it.
-    private var childWaiters: [String: (String?) -> Void] = [:]
+	private struct CachedTab {
+		weak var browser: CraBrowser?
+		let tabTarget: String
+	}
+	/// Page browser → its "tab" target (triggerAction only accepts tab targets).
+	private var tabTargets: [ObjectIdentifier: CachedTab] = [:]
+	/// Tab session → callback with the page target that auto-attaches under it.
+	private var childWaiters: [String: (String?) -> Void] = [:]
 
-    var isAvailable: Bool { CraCEFRuntime.hasBrowserDevTools() }
+	var isAvailable: Bool { CraCEFRuntime.hasBrowserDevTools() }
 
-    private init() {
-        // The pipe delivers on the main queue.
-        CraCEFRuntime.setBrowserDevToolsEventHandler { [weak self] method, params, sessionID in
-            MainActor.assumeIsolated { self?.handleEvent(method, params: params, sessionID: sessionID) }
-        }
-    }
+	private init() {
+		// The pipe delivers on the main queue.
+		CraCEFRuntime.setBrowserDevToolsEventHandler { [weak self] method, params, sessionID in
+			MainActor.assumeIsolated {
+				self?.handleEvent(method, params: params, sessionID: sessionID)
+			}
+		}
+	}
 
-    /// Where a popup Cra did not ask for hangs (screen top-right point), nil to leave it where
-    /// Chrome put it.
-    private var defaultAnchor: () -> NSPoint? = { nil }
-    /// True while `run` waits for its own popup.
-    private var placingOwnPopup = false
+	/// Where a popup Cra did not ask for hangs (screen top-right point), nil to leave it where
+	/// Chrome put it.
+	private var defaultAnchor: () -> NSPoint? = { nil }
+	/// True while `run` waits for its own popup.
+	private var placingOwnPopup = false
 
-    /// Popups can open without Cra's buttons: the extension's keyboard shortcut (1Password's
-    /// ⌘⇧X) or chrome.action.openPopup() (1Password's inline menu). Arc hosts every popup
-    /// under its toolbar (ArcCore hands it over in browser:didOpenExtensionPopup:webContents:);
-    /// Cra watches for popup pages being created and moves those under `anchor` too.
-    func watchPopups(anchor: @escaping () -> NSPoint?) {
-        defaultAnchor = anchor
-        guard isAvailable else { return }
-        Task { _ = try? await call("Target.setDiscoverTargets", ["discover": true]) }
-    }
+	/// Popups can open without Cra's buttons: the extension's keyboard shortcut (1Password's
+	/// ⌘⇧X) or chrome.action.openPopup() (1Password's inline menu). Arc hosts every popup
+	/// under its toolbar (ArcCore hands it over in browser:didOpenExtensionPopup:webContents:);
+	/// Cra watches for popup pages being created and moves those under `anchor` too.
+	func watchPopups(anchor: @escaping () -> NSPoint?) {
+		defaultAnchor = anchor
+		guard isAvailable else { return }
+		Task { _ = try? await call("Target.setDiscoverTargets", ["discover": true]) }
+	}
 
-    /// Triggers the action; `anchor` is the top-right point (screen coordinates) the popup hangs from.
-    /// Returns false when the pipe or the page is unavailable (the caller falls back).
-    @discardableResult
-    func run(_ extensionID: String, on browser: CraBrowser, anchor: NSPoint) async -> Bool {
-        guard isAvailable else { return false }
-        do {
-            let tab = try await tabTarget(for: browser)
-            let before = visibleWindows()
-            placingOwnPopup = true
-            _ = try await call("Extensions.triggerAction", ["id": extensionID, "targetId": tab])
-            placePopup(appearingAfter: before, anchor: anchor)
-            return true
-        } catch {
-            placingOwnPopup = false
-            NSLog("Cra: extension action %@ failed: %@", extensionID, String(describing: error))
-            tabTargets[ObjectIdentifier(browser)] = nil
-            return false
-        }
-    }
+	/// Triggers the action; `anchor` is the top-right point (screen coordinates) the popup hangs from.
+	/// Returns false when the pipe or the page is unavailable (the caller falls back).
+	@discardableResult
+	func run(_ extensionID: String, on browser: CraBrowser, anchor: NSPoint) async -> Bool {
+		guard isAvailable else { return false }
+		do {
+			let tab = try await tabTarget(for: browser)
+			let before = visibleWindows()
+			placingOwnPopup = true
+			_ = try await call("Extensions.triggerAction", ["id": extensionID, "targetId": tab])
+			placePopup(appearingAfter: before, anchor: anchor)
+			return true
+		} catch {
+			placingOwnPopup = false
+			NSLog("Cra: extension action %@ failed: %@", extensionID, String(describing: error))
+			tabTargets[ObjectIdentifier(browser)] = nil
+			return false
+		}
+	}
 
-    // MARK: Popup placement
+	// MARK: Popup placement
 
-    /// Chrome creates the popup's window hidden, sometimes before the popup page exists, so
-    /// "new" means newly visible.
-    private func visibleWindows() -> Set<ObjectIdentifier> {
-        Set(NSApp.windows.filter(\.isVisible).map(ObjectIdentifier.init))
-    }
+	/// Chrome creates the popup's window hidden, sometimes before the popup page exists, so
+	/// "new" means newly visible.
+	private func visibleWindows() -> Set<ObjectIdentifier> {
+		Set(NSApp.windows.filter(\.isVisible).map(ObjectIdentifier.init))
+	}
 
-    /// Chrome shows the popup once its page has loaded; watch for the new window and frame it
-    /// under the anchor (ExtensionPopupWindow, Arc's BrowserExtensionWindow).
-    private func placePopup(appearingAfter before: Set<ObjectIdentifier>, anchor: NSPoint, attempt: Int = 0) {
-        // Chrome's popup bubble is borderless; an extension's own (titled) window is not one.
-        if let popup = NSApp.windows.first(where: { !before.contains(ObjectIdentifier($0)) && $0.isVisible && $0.frame.width > 1
-                                                    && !$0.styleMask.contains(.titled) && !($0 is NSPanel)
-                                                    && !CraCEFRuntime.isPageWindow($0) }) {
-            placingOwnPopup = false
-            ExtensionPopupWindow.present(popup, anchor: anchor)
-            return
-        }
-        // No popup yet (still loading), or an action without one (onClicked): keep looking for 3 s.
-        guard attempt < 60 else { placingOwnPopup = false; return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-            MainActor.assumeIsolated { self?.placePopup(appearingAfter: before, anchor: anchor, attempt: attempt + 1) }
-        }
-    }
+	/// Chrome shows the popup once its page has loaded; watch for the new window and frame it
+	/// under the anchor (ExtensionPopupWindow, Arc's BrowserExtensionWindow).
+	private func placePopup(
+		appearingAfter before: Set<ObjectIdentifier>, anchor: NSPoint, attempt: Int = 0
+	) {
+		// Chrome's popup bubble is borderless; an extension's own (titled) window is not one.
+		if let popup = NSApp.windows.first(where: {
+			!before.contains(ObjectIdentifier($0)) && $0.isVisible && $0.frame.width > 1
+				&& !$0.styleMask.contains(.titled) && !($0 is NSPanel)
+				&& !CraCEFRuntime.isPageWindow($0)
+		}) {
+			placingOwnPopup = false
+			ExtensionPopupWindow.present(popup, anchor: anchor)
+			return
+		}
+		// No popup yet (still loading), or an action without one (onClicked): keep looking for 3 s.
+		guard attempt < 60 else {
+			placingOwnPopup = false
+			return
+		}
+		DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+			MainActor.assumeIsolated {
+				self?.placePopup(appearingAfter: before, anchor: anchor, attempt: attempt + 1)
+			}
+		}
+	}
 
-    // MARK: Targets
+	// MARK: Targets
 
-    private enum Failure: Error { case protocolError(String), noTabTarget }
+	private enum Failure: Error {
+		case protocolError(String)
+		case noTabTarget
+	}
 
-    /// The tab target that holds this browser's page: attach to each tab target and let it
-    /// auto-attach its page (the protocol has no direct page → tab link). Cached per browser.
-    private func tabTarget(for browser: CraBrowser) async throws -> String {
-        if let cached = tabTargets[ObjectIdentifier(browser)], cached.browser === browser { return cached.tabTarget }
-        let info = try await pageCall(browser, "Target.getTargetInfo")
-        guard let page = info["targetInfo"] as? [String: Any], let pageID = page["targetId"] as? String else { throw Failure.noTabTarget }
-        let url = page["url"] as? String
-        let tabs = (try await call("Target.getTargets", ["filter": [["type": "tab"]]])["targetInfos"] as? [[String: Any]]) ?? []
-        // Same URL first: usually the only one that needs checking.
-        let ordered = tabs.filter { $0["url"] as? String == url } + tabs.filter { $0["url"] as? String != url }
-        for tab in ordered {
-            guard let tabID = tab["targetId"] as? String else { continue }
-            if try await pageTarget(inTab: tabID) == pageID {
-                tabTargets[ObjectIdentifier(browser)] = CachedTab(browser: browser, tabTarget: tabID)
-                return tabID
-            }
-        }
-        throw Failure.noTabTarget
-    }
+	/// The tab target that holds this browser's page: attach to each tab target and let it
+	/// auto-attach its page (the protocol has no direct page → tab link). Cached per browser.
+	private func tabTarget(for browser: CraBrowser) async throws -> String {
+		if let cached = tabTargets[ObjectIdentifier(browser)], cached.browser === browser {
+			return cached.tabTarget
+		}
+		let info = try await pageCall(browser, "Target.getTargetInfo")
+		guard let page = info["targetInfo"] as? [String: Any],
+			let pageID = page["targetId"] as? String
+		else { throw Failure.noTabTarget }
+		let url = page["url"] as? String
+		let tabs =
+			(try await call("Target.getTargets", ["filter": [["type": "tab"]]])["targetInfos"]
+				as? [[String: Any]]) ?? []
+		// Same URL first: usually the only one that needs checking.
+		let ordered =
+			tabs.filter { $0["url"] as? String == url }
+			+ tabs.filter { $0["url"] as? String != url }
+		for tab in ordered {
+			guard let tabID = tab["targetId"] as? String else { continue }
+			if try await pageTarget(inTab: tabID) == pageID {
+				tabTargets[ObjectIdentifier(browser)] = CachedTab(
+					browser: browser, tabTarget: tabID)
+				return tabID
+			}
+		}
+		throw Failure.noTabTarget
+	}
 
-    private func pageTarget(inTab tabID: String) async throws -> String? {
-        let attached = try await call("Target.attachToTarget", ["targetId": tabID, "flatten": true])
-        guard let session = attached["sessionId"] as? String else { return nil }
-        let page: String? = await withCheckedContinuation { cont in
-            childWaiters[session] = { cont.resume(returning: $0) }
-            Task {
-                _ = try? await self.call("Target.setAutoAttach", ["autoAttach": true, "waitForDebuggerOnStart": false, "flatten": true],
-                                         session: session)
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
-                MainActor.assumeIsolated { self?.childWaiters.removeValue(forKey: session)?(nil) }
-            }
-        }
-        _ = try? await call("Target.detachFromTarget", ["sessionId": session])
-        return page
-    }
+	private func pageTarget(inTab tabID: String) async throws -> String? {
+		let attached = try await call(
+			"Target.attachToTarget", ["targetId": tabID, "flatten": true])
+		guard let session = attached["sessionId"] as? String else { return nil }
+		let page: String? = await withCheckedContinuation { cont in
+			childWaiters[session] = { cont.resume(returning: $0) }
+			Task {
+				_ = try? await self.call(
+					"Target.setAutoAttach",
+					["autoAttach": true, "waitForDebuggerOnStart": false, "flatten": true],
+					session: session)
+			}
+			DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+				MainActor.assumeIsolated { self?.childWaiters.removeValue(forKey: session)?(nil) }
+			}
+		}
+		_ = try? await call("Target.detachFromTarget", ["sessionId": session])
+		return page
+	}
 
-    private func handleEvent(_ method: String, params: String, sessionID: String?) {
-        if method == "Target.targetCreated" || method == "Target.targetInfoChanged" { popupPageCreated(params); return }
-        guard method == "Target.attachedToTarget", let sessionID, childWaiters[sessionID] != nil,
-              let p = try? JSONSerialization.jsonObject(with: Data(params.utf8)) as? [String: Any],
-              let info = p["targetInfo"] as? [String: Any], info["type"] as? String == "page" else { return }
-        childWaiters.removeValue(forKey: sessionID)?(info["targetId"] as? String)
-    }
+	private func handleEvent(_ method: String, params: String, sessionID: String?) {
+		if method == "Target.targetCreated" || method == "Target.targetInfoChanged" {
+			popupPageCreated(params)
+			return
+		}
+		guard method == "Target.attachedToTarget", let sessionID, childWaiters[sessionID] != nil,
+			let p = try? JSONSerialization.jsonObject(with: Data(params.utf8)) as? [String: Any],
+			let info = p["targetInfo"] as? [String: Any], info["type"] as? String == "page"
+		else { return }
+		childWaiters.removeValue(forKey: sessionID)?(info["targetId"] as? String)
+	}
 
-    /// Popup targets already seen (each is placed once).
-    private var seenPopupTargets: Set<String> = []
+	/// Popup targets already seen (each is placed once).
+	private var seenPopupTargets: Set<String> = []
 
-    /// A target for an extension's popup URL that Cra's own `run` is not waiting for. Chrome
-    /// creates it blank ("other", no URL) and reports the URL in a later targetInfoChanged.
-    private func popupPageCreated(_ params: String) {
-        guard let p = try? JSONSerialization.jsonObject(with: Data(params.utf8)) as? [String: Any],
-              let info = p["targetInfo"] as? [String: Any], let target = info["targetId"] as? String,
-              let url = (info["url"] as? String).flatMap(URL.init(string:)), url.scheme == "chrome-extension",
-              let id = url.host, url.fragment == nil,
-              let popup = ExtensionStore.shared.entries.first(where: { $0.extensionID == id })?.popupPath,
-              url.path == "/" + popup.trimmingCharacters(in: CharacterSet(charactersIn: "/")),
-              seenPopupTargets.insert(target).inserted, !placingOwnPopup,
-              let anchor = defaultAnchor() else { return }
-        placePopup(appearingAfter: visibleWindows(), anchor: anchor)
-    }
+	/// A target for an extension's popup URL that Cra's own `run` is not waiting for. Chrome
+	/// creates it blank ("other", no URL) and reports the URL in a later targetInfoChanged.
+	private func popupPageCreated(_ params: String) {
+		guard let p = try? JSONSerialization.jsonObject(with: Data(params.utf8)) as? [String: Any],
+			let info = p["targetInfo"] as? [String: Any], let target = info["targetId"] as? String,
+			let url = (info["url"] as? String).flatMap(URL.init(string:)),
+			url.scheme == "chrome-extension",
+			let id = url.host, url.fragment == nil,
+			let popup = ExtensionStore.shared.entries.first(where: { $0.extensionID == id })?
+				.popupPath,
+			url.path == "/" + popup.trimmingCharacters(in: CharacterSet(charactersIn: "/")),
+			seenPopupTargets.insert(target).inserted, !placingOwnPopup,
+			let anchor = defaultAnchor()
+		else { return }
+		placePopup(appearingAfter: visibleWindows(), anchor: anchor)
+	}
 
-    // MARK: Protocol calls
+	// MARK: Protocol calls
 
-    private func call(_ method: String, _ params: [String: Any] = [:], session: String? = nil) async throws -> [String: Any] {
-        let json = String(decoding: try JSONSerialization.data(withJSONObject: params), as: UTF8.self)
-        return try await withCheckedThrowingContinuation { cont in
-            CraCEFRuntime.sendBrowserDevToolsMethod(method, params: json, sessionID: session) { result, error in
-                if let result, let obj = try? JSONSerialization.jsonObject(with: Data(result.utf8)) as? [String: Any] {
-                    cont.resume(returning: obj)
-                } else {
-                    cont.resume(throwing: Failure.protocolError(error ?? "bad reply to \(method)"))
-                }
-            }
-        }
-    }
+	private func call(_ method: String, _ params: [String: Any] = [:], session: String? = nil)
+		async throws -> [String: Any]
+	{
+		let json = String(
+			decoding: try JSONSerialization.data(withJSONObject: params), as: UTF8.self)
+		return try await withCheckedThrowingContinuation { cont in
+			CraCEFRuntime.sendBrowserDevToolsMethod(method, params: json, sessionID: session) {
+				result, error in
+				if let result,
+					let obj = try? JSONSerialization.jsonObject(with: Data(result.utf8))
+						as? [String: Any]
+				{
+					cont.resume(returning: obj)
+				} else {
+					cont.resume(throwing: Failure.protocolError(error ?? "bad reply to \(method)"))
+				}
+			}
+		}
+	}
 
-    private func pageCall(_ browser: CraBrowser, _ method: String) async throws -> [String: Any] {
-        try await withCheckedThrowingContinuation { cont in
-            browser.sendDevToolsMethod(method, params: "{}") { result, error in
-                if let result, let obj = try? JSONSerialization.jsonObject(with: Data(result.utf8)) as? [String: Any] {
-                    cont.resume(returning: obj)
-                } else {
-                    cont.resume(throwing: Failure.protocolError(error ?? "bad reply to \(method)"))
-                }
-            }
-        }
-    }
+	private func pageCall(_ browser: CraBrowser, _ method: String) async throws -> [String: Any] {
+		try await withCheckedThrowingContinuation { cont in
+			browser.sendDevToolsMethod(method, params: "{}") { result, error in
+				if let result,
+					let obj = try? JSONSerialization.jsonObject(with: Data(result.utf8))
+						as? [String: Any]
+				{
+					cont.resume(returning: obj)
+				} else {
+					cont.resume(throwing: Failure.protocolError(error ?? "bad reply to \(method)"))
+				}
+			}
+		}
+	}
 }

@@ -8,6 +8,7 @@ No Ghidra/IDA/Hopper on this Mac, so no decompiled logic. Nothing below was obse
 Legend: [O] observed in shipped artifact or data file, [I] inference, [U] unknown.
 
 ## Architecture
+
 - [O] Native Swift app. Framework "ARC" with feature modules (CommandBar, SidebarDataStore, StorableSidebar, Archive,
   SpaceStyleEditor, TypeTravel, LittleBrowser, HoverCards...). UI is AppKit: SidebarViewController, SidebarDockViewController,
   NSCollectionView layouts, CommandBarTextField, SuggestionsView.
@@ -15,6 +16,7 @@ Legend: [O] observed in shipped artifact or data file, [I] inference, [U] unknow
 - [I] So Arc = native chrome + Chromium engine. Cra uses WKWebView instead (design choice, not a copy).
 
 ## Sidebar data model (StorableSidebar.json)
+
 - [O] `sidebar.containers` = [ {global}, {spaces, topAppsContainerIDs, items} ]. Lists are flat [id, object, id, object...].
 - [O] SpaceModel: id, title, profile, containerIDs = ["pinned", <id>, "unpinned", <id>], customInfo.iconType {emoji_v2, emoji},
   customInfo.windowTheme = blendedGradient { baseColors[2], overlayColors, modifiers{noiseFactor,intensityFactor,overlay:"grain"},
@@ -22,10 +24,10 @@ Legend: [O] observed in shipped artifact or data file, [I] inference, [U] unknow
   semanticColorPalette (foregroundPrimary/Secondary/Tertiary, backgroundExtra, maxContrastColor...).
 - [O] SidebarItem: id, parentID, title (null unless user renamed; custom title overrides page title), childrenIds[], isUnread,
   createdAt, originatingDevice, data = one of
-  - tab { savedURL, savedTitle, savedMuteStatus, timeLastActiveAt, activeTabBeforeCreationID, referrerID?, liveItemID? }
-  - list {} = folder (optional customInfo.iconType; optional automaticLiveFolderData for GitHub live folders)
-  - itemContainer { containerType: topApps{profile} | spaceItems{spaceID} }
-  - [O strings only] easel, splitView, arcDocument, tabGroup also exist.
+    - tab { savedURL, savedTitle, savedMuteStatus, timeLastActiveAt, activeTabBeforeCreationID, referrerID?, liveItemID? }
+    - list {} = folder (optional customInfo.iconType; optional automaticLiveFolderData for GitHub live folders)
+    - itemContainer { containerType: topApps{profile} | spaceItems{spaceID} }
+    - [O strings only] easel, splitView, arcDocument, tabGroup also exist.
 - [O] Favorites = the "topApps" container, one per profile, shared by all spaces (StorableSidebar.topAppsContainerIDs).
 - [O] Every space owns one pinned container and one unpinned ("Today") container; ordering = childrenIds; folders nest via parentID.
 - [O] A pinned tab keeps savedURL/savedTitle as its home; strings: resetTab, resetCurrentTab, replacePinnedTab,
@@ -41,20 +43,24 @@ Legend: [O] observed in shipped artifact or data file, [I] inference, [U] unknow
   macOS Space and ignored synthetic input, 26 Oct). Cra: WindowPrefs.collapsedPinnedSpaces, SpaceHeader.
 
 ## Window state (StorableWindows.json)
+
 - [O] sidebarWidth 328, sidebarMode "anchored" (binary also has floating, hidden, collapsed), focusedSpaceID, lastFocusedSpaceID,
   expandedItems (folder expansion, per window), itemLastActiveDates, itemCreatedDates, splitViewState, windowContents.
 
 ## Spaces
+
 - [O] SidebarDock = space switcher at the bottom (icons/emoji, tooltip), SidebarPagingContainer = horizontal paging between spaces,
   SpaceCreation view, SpaceStyleEditor (color pad, dial, color picker), SpaceIconPicker (emoji), SpaceManagement (reorder),
   focusNextSpace/previous, LinkRouting rules (URL match -> space or Little Arc), per-space profile.
 
 ## Archive (StorableArchiveItems.json)
+
 - [O] { archivedAt, reason: manual|auto, source: space{id}|littleArc|standaloneSidebar|unknown, sidebarItem: <copy> }.
 - [O] Auto-archive thresholds enum: twelveHours, twentyFourHours, sevenDays, thirtyDays (this Mac: sevenDays, per profile).
 - [O] Actions: viewArchive, clearArchive, reopenClosedTab, resetSpace, archiveTab.
 
 ## Command bar (ARC_CommandBar.bundle + strings + StorableCommandBarAdditionalRanking.json)
+
 - [O] Entry points: keyboardShortcutT, keyboardShortcutL, keyboardShortcutFocusSidebar, keyboardShortcutCommandOptionG,
   sidebarDoubleClick, sidebarNewTabButton, placeholderClick, littleArcPlaceholderClick, topbar, appMenu*,
   toggleBetweenTypeTravelAndCommandBar.
@@ -71,6 +77,7 @@ Legend: [O] observed in shipped artifact or data file, [I] inference, [U] unknow
 - [U] Weights of the ranking model (a CoreML tensor, CommandBarRankingTensor) are not recoverable statically.
 
 ## Key bindings (StorableKeyBindings.json + strings)
+
 - [O] Action = {identifier, name}; binding = {keyEquivalent, deviceIndependentModifierFlags}, priority, typeTravelTriggers;
   user overrides persisted. item1..item9 = "Go to Sidebar Item N" with flags 1048576 (= Command).
 - [O] Action identifiers: newTab, newWindow, newBlankWindow, newSpace, newFolder, newEasel, newNote, closeWindow, archiveTab,
@@ -94,6 +101,7 @@ Legend: [O] observed in shipped artifact or data file, [I] inference, [U] unknow
   View History ⌘Y. Window: Minimize ⌘M, Open Library ⇧⌘L, View Downloads ⇧⌘J.
 
 ## Visual reference (Arc 1.168, measured at 2x from window captures)
+
 - [O] Sidebar 328pt wide. Row 1: traffic lights, sidebar toggle right after them (~93pt), nav ← → ↻ right-aligned when a
   tab is selected and the toolbar shows the URL; with no tab the nav moves into the toolbar and the toolbar shows a
   centered "Search or Enter URL…". Favorites: 4 tiles, ~44pt tall, active tile gets a dashed outline. Space header: emoji +
@@ -108,16 +116,19 @@ Legend: [O] observed in shipped artifact or data file, [I] inference, [U] unknow
   space color. ⌘L with the toolbar visible edits inline: dropdown hangs under the toolbar across the content width.
 
 ## Dia 1.54 (company.thebrowser.dia)
+
 - [O] ~/Library/Application Support/Dia/StorableProfileContainers.json: containers per profile with `window` or
   `favorites` kinds; tabs[].contents[].variant = webContent{_0:{title,url}} | newTabPage. StorableAutoArchive.json:
   containers[].archivedTabs (empty here). Chromium profile at User Data/Profile 7 with Bookmarks whose bookmark-bar
   folders mirror Arc spaces ("Favorites", "Victor", "JYSK").
 
 ## Other observed features (not in Cra's first scope)
+
 - Little Arc (LittleBrowser), Peek, Easels, Boosts, split view, hover cards, site control center, sidebar banners,
   sync via CloudKit + Firebase, Chromium extensions, "Tidy", Ask Arc.
 
 ## Rendering recipe fitted to Victor's Arc captures (24 Oct 2026)
+
 - [O] Light "Victor" theme (isVibrant, intensity 0.25) renders as #93926A–#AA9470 on this desktop: gradient at 25% over the
   blurred desktop. Cra reproduces it with a behind-window NSVisualEffectView, a 22% white lift and gradient alpha = intensity.
 - [O] Dark "JYSK" theme renders #292538 from base #01021F/#1A001F: about 27% of the colour over #2B2632.
@@ -137,12 +148,12 @@ shadow unless `-o` is passed.
 
 Measured on the "Victor" theme (Arc base #F8D558 / #A4F454, overlay → #FF7567, intensity 0.25):
 
-| | over white | over black |
-|---|---|---|
-| Arc sidebar, top | 206 200 160 | 124 118 77 |
+|                     | over white  | over black |
+| ------------------- | ----------- | ---------- |
+| Arc sidebar, top    | 206 200 160 | 124 118 77 |
 | Arc sidebar, bottom | 212 181 141 | 154 124 82 |
-| Cra (final) top | 199 192 152 | 124 117 76 |
-| Cra (final) bottom | 213 184 142 | 154 125 82 |
+| Cra (final) top     | 199 192 152 | 124 117 76 |
+| Cra (final) bottom  | 213 184 142 | 154 125 82 |
 
 Cra's recipe for light vibrant themes: `NSVisualEffectView` `.hudWindow`, dark appearance,
 `state` driven explicitly from app activation (`.active` / `.inactive`; the key-window
@@ -229,6 +240,7 @@ model below comes from parsing the arm64 slice's Swift reflection metadata (`__s
 No decompiler, so property names and types are observed; the algorithms are inferred from them.
 
 ### Where it lives
+
 - [O] Everything is in Arc's native Swift shell, not in Chromium. ArcCore (Chromium) only carries upstream
   Chrome's own `tabs.createSplit` / `splitViewId` extension API and "Cannot create split view with
   non-adjacent tabs" strings; the Arc UI never references them.
@@ -251,13 +263,14 @@ No decompiler, so property names and types are observed; the algorithms are infe
   BaseModels (`SidebarSplitViewData`, `SplitViewPaneMenuOperation`), SidebarUI (`SplitViewCellState`).
 
 ### Data model
+
 - [O] Sidebar: a split is a sidebar item like a folder. `SidebarItemData.splitView(SidebarSplitViewData)`
   with `itemWidthFactors: [Identifier<SidebarItem>: CGFloat]`, `layoutOrientation: horizontal|vertical`,
   `timeLastActiveAt: Date?`, `customInfo: { iconType: SidebarCustomIcon }?` (user icon, used together with
   the item `title` when renamed), `focusItemID: Identifier<SidebarItem>?`. The tabs are the item's
   `childrenIds` (order = pane order, left→right / top→bottom). JSON on this Mac:
   `{"data":{"splitView":{"itemWidthFactors":[<id>,0.3835,<id>,0.6165],"layoutOrientation":"horizontal",
-  "focusItemID":<id>,"timeLastActiveAt":…,"customInfo":null}},"childrenIds":[…],"parentID":<container>,…}`.
+"focusItemID":<id>,"timeLastActiveAt":…,"customInfo":null}},"childrenIds":[…],"parentID":<container>,…}`.
   All 21 local splits: 2 children, horizontal, parent = a space's pinned/unpinned container (not inside
   folders here), title/customInfo never set. Untouched splits store a single factor `[firstChild, 0.5]`;
   after a drag both factors are stored and sum to 1.0. One zombie split with 0 children exists; the
@@ -265,38 +278,39 @@ No decompiler, so property names and types are observed; the algorithms are infe
   rawUpdate/appliedChange/publishedValue) and repairs it on sync. [I] Missing factors = equal share of
   the remainder.
 - [O] Window: `WindowContents.State { windowContents: [WindowContentID: WindowContent], splitViewState,
-  modalWindowContentV2State, windowContentSidebarItemMap: BidirectionalMap<WindowContentID,
-  Identifier<SidebarItem>> }`. `SplitViewState { windowContentIDs: OrderedSet<WindowContentID>,
-  layoutOrientation, interactionState, focusedContentID }`; only `windowContentIDs` + `focusedContentID`
+modalWindowContentV2State, windowContentSidebarItemMap: BidirectionalMap<WindowContentID,
+Identifier<SidebarItem>> }`. `SplitViewState { windowContentIDs: OrderedSet<WindowContentID>,
+layoutOrientation, interactionState, focusedContentID }`; only `windowContentIDs` + `focusedContentID`
   are Codable (StorableWindows.json `splitViewState`), orientation and widths are rebuilt from the
   sidebar item. `InteractionState { activePaneEditStyles: Set<.dragAndDrop>, proposedWindowContentDropTarget:
-  WindowContentID?, isResizingPanes }`. Legacy `SplitViewState_Legacy { windowContentIDs }`.
+WindowContentID?, isResizingPanes }`. Legacy `SplitViewState_Legacy { windowContentIDs }`.
 - [O] Per-window width cache: `WindowSplitViewLayout { paneWidths: [CGFloat] }` kept by
   `SplitViewLayoutCache { storeLayoutForWindowID, layoutForWindowID }` (a TCA DependencyKey) and
   handed to the view as `restorableSplitViewLayout`; `SplitViewWindowContentContext { numPanes,
-  restorablePaneWidths: [CGFloat]?, splitViewLayoutOrientation }` is what the container passes to
+restorablePaneWidths: [CGFloat]?, splitViewLayoutOrientation }` is what the container passes to
   `SplitViewController`.
 - [O] Container view state (`WindowContentsContainerViewController.ViewState`): `splitViewWindowContentIDs:
-  OrderedSet<WindowContentID>`, `focusedContentID`, `splitViewLayoutOrientation`, `restorableSplitViewLayout`,
+OrderedSet<WindowContentID>`, `focusedContentID`, `splitViewLayoutOrientation`, `restorableSplitViewLayout`,
   `canDragOntoSplit`, `isDraggingToCreateSplitView`, `shouldShowInteractivePaneInsertionHandle`,
   `contentInsets`, `contentCornerRadius`, `hiddenScrimEdges`, `sidebarPresentation`.
 
 ### The layout engine (ARCUI.SplitViewController)
+
 - [O] Properties: `draggerHandleWidth`, `draggerHandleHitTargetOutset`, `minimumPaneWidth`,
   `layoutOrientation`, `displayInteractivePaneInsertionDraggerHandle`, `allowInteractivePaneInsertion`,
   `verticalLayoutOrientationFromDragAllowed`, `shouldDisplayDraggerPaneForSecondaryAxis`,
   `isDragDropHapticFeedbackEnabled`, weak `delegate`, `contentPanes: OrderedDictionary<Identifier<ContentPane>,
-  ContentPane>`, `paneResizeState?`, `dragDestinationState?`, `dragSourceState?`,
+ContentPane>`, `paneResizeState?`, `dragDestinationState?`, `dragSourceState?`,
   `dragInfoSubject: PassthroughSubject<NSDraggingInfo, Never>`, lazy `minimumWidthConstraint`.
 - [O] `SplitViewControllerLayout.ContentPane { id, view: NSView & SplitViewContentPane, trailingDraggerHandle,
-  bottomDraggerHandle: DraggerHandle { view: NSView & SplitViewControllerDraggerHandleType }, widthFactor: CGFloat,
-  resizeStyle: flexible|fixed, displayState: collapsed|expanded, inFlightTransition: StateTransition?,
-  content: .dropRegion(NSView) | .viewController(SplitViewContentPaneContentViewController) }`.
+bottomDraggerHandle: DraggerHandle { view: NSView & SplitViewControllerDraggerHandleType }, widthFactor: CGFloat,
+resizeStyle: flexible|fixed, displayState: collapsed|expanded, inFlightTransition: StateTransition?,
+content: .dropRegion(NSView) | .viewController(SplitViewContentPaneContentViewController) }`.
   `StateTransition { identifier: UUID, targetState, style: .animated(removePaneOnCompletion: Bool) | .immediate,
-  draggerHandleWidth: CGFloat? }`. `ContentPanePair { leading, trailing? }`.
+draggerHandleWidth: CGFloat? }`. `ContentPanePair { leading, trailing? }`.
 - [O] `SplitViewControllerLayout.Context { contentPanes, containerSize, backingScaleFactor, minimumPaneWidth,
-  draggerHandleWidth, displayInteractivePaneInsertionDraggerHandle, shouldDisplayDraggerPaneForSecondaryAxis,
-  layoutOrientation, yAxisOriginAtTop }` → frames are a pure function of the context (pixel-snapped via
+draggerHandleWidth, displayInteractivePaneInsertionDraggerHandle, shouldDisplayDraggerPaneForSecondaryAxis,
+layoutOrientation, yAxisOriginAtTop }` → frames are a pure function of the context (pixel-snapped via
   backingScaleFactor). [I] Each pane gets `widthFactor × (container − handles)` along the main axis, clamped to
   `minimumPaneWidth`; every pane carries its own trailing (horizontal) and bottom (vertical) handle view, the
   last one hidden or used as the "insert a pane here" handle when `displayInteractivePaneInsertionDraggerHandle`.
@@ -305,8 +319,8 @@ No decompiler, so property names and types are observed; the algorithms are infe
   (double-click a handle = reset to equal widths, [I]). Dragging snaps to the 50/50 centre when allowed.
   Pane add/remove animates via `StateTransition` (collapsed ↔ expanded, remove on completion).
 - [O] Panes are hosted in `SplitViewContentPaneView: NSView { contentView, contentConstraints:
-  LayoutConstraintsMap<NSLayoutConstraint.Attribute>, lockContentWidth: Bool, lockedContentAlignment:
-  leading|center|trailing, userInteractionEnabled }` (overrides hitTest). [I] While a handle is being
+LayoutConstraintsMap<NSLayoutConstraint.Attribute>, lockContentWidth: Bool, lockedContentAlignment:
+leading|center|trailing, userInteractionEnabled }` (overrides hitTest). [I] While a handle is being
   dragged the web content keeps its old width and is pinned to one edge instead of relayouting Chromium on
   every mouse move; `userInteractionEnabled=false` blocks the page from eating the drag.
   `WindowContentViewController` adds `ContentResizeMode { intrinsic, throttle, locked }`,
@@ -316,20 +330,21 @@ No decompiler, so property names and types are observed; the algorithms are infe
   `backgroundView: WindowBackgroundContainerView?` so the space theme shows through the gap, `isHighlighted`,
   `draggableArea: NSTrackingArea`, `draggableRegion: CGRect`, `resetCursorRects`, mouseEntered/Exited,
   `contentAppearance`) with `ViewState { displayBackgroundView, windowBackgroundConfiguration,
-  contentOverBackgroundAppearance, isHandleVisible, metalWindowBackgroundRenderingEnabled }`;
+contentOverBackgroundAppearance, isHandleVisible, metalWindowBackgroundRenderingEnabled }`;
   `SplitViewBottomDraggerHandleView` for vertical layouts adds `handle: .dragger | .scrimLoader` and
   `isContentBelowLoading` (the handle doubles as a loading scrim). ARCUI ships a plain
   `SplitViewControllerDefaultDraggerHandleView`.
 
 ### Drag and drop (how a split is created with the mouse)
+
 - [O] `SplitViewController` is both `NSDraggingSource` and `NSDraggingDestination` (draggingEntered/Updated/
   Exited/Ended, prepareForDragOperation, performDragOperation, wantsPeriodicDraggingUpdates,
   updateDraggingItemsForDrag, draggingSession:…). `DragSourceState { contentPaneID, initialIndex,
-  initialWidthFactor, contentPaneSnapshot: NSImage?, contentPaneSize }` = reordering a pane by dragging its
+initialWidthFactor, contentPaneSnapshot: NSImage?, contentPaneSize }` = reordering a pane by dragging its
   toolbar (snapshot image as drag preview). `DragDestinationState { operation: NSDragOperation,
-  isDraggingInView, proposedTarget: DropTarget?, isDraggingContentPane }`.
+isDraggingInView, proposedTarget: DropTarget?, isDraggingContentPane }`.
 - [O] `DropTarget = .replaceContent(index) | .insertContent(index)`; `ProposedDropTargetInfo { target,
-  dropRegionInsertionIndex: Int?, existingDropRegion: ContentPane?, layoutOrientation }`. [I] Hovering near an
+dropRegionInsertionIndex: Int?, existingDropRegion: ContentPane?, layoutOrientation }`. [I] Hovering near an
   edge inserts a temporary `.dropRegion` pane (placeholder view, animated open) at that index; hovering over
   the middle of a pane proposes replacing it; `verticalLayoutOrientationFromDragAllowed` lets a drop on the
   top/bottom edge flip the layout to vertical.
@@ -344,6 +359,7 @@ No decompiler, so property names and types are observed; the algorithms are infe
   Onboarding copy: "Drag a tab from your sidebar into the middle of the screen to create a Split View."
 
 ### Commands, menus, entry points
+
 - [O] `WindowAction.SplitViewAction`: `addPanel(index: InsertionLocation, showCommandBar: Bool)`,
   `movePanel(from:to:)`, `onDropSidebarItem`, `onDropURL`, `onDidBeginWindowContentsSplitViewPaneResize`,
   `onDidEndWindowContentsSplitViewPaneResize(WindowSplitViewLayout)`, `onDidUpdateSplitViewProposedDropTarget`,
@@ -352,7 +368,7 @@ No decompiler, so property names and types are observed; the algorithms are infe
   `onDidMoveItemsWithinContainer`, `onDidRemoveItemsFromContainers(itemIDs)`, `onDidAdjustLayoutOrientation`.
 - [O] Where a new pane goes: `WindowContentPresentationDisposition.splitView(SplitViewTarget)` with
   `.paneAtIndex(Int) | .newPane(InsertionLocation) | .pane(WindowContentID) | .replaceAllPanes |
-  .firstEmptyOrNewPane`; `InsertionLocation = .index(Int) | .after(id) | .before(id) | .last | .afterFocusedPane`.
+.firstEmptyOrNewPane`; `InsertionLocation = .index(Int) | .after(id) | .before(id) | .last | .afterFocusedPane`.
 - [O] Pane menu (`SplitViewPaneMenuOperation`, each `.enabled|.disabled`): moveLeft, moveRight, addPaneLeft,
   addPaneRight, addPaneTop, addPaneBottom, separate, copyLink, flipLayoutOrientation. Toolbar menu items
   (`ContentPanelSplitViewMenuItemType`): move/add/separate/copyLink × horizontal/vertical, flipToVertical,
@@ -370,26 +386,28 @@ No decompiler, so property names and types are observed; the algorithms are infe
   Option-click on a split child's close button un-splits (`option-click-split-tab-close-button-to-unsplit-enabled`).
 - [O] Limits: errors `splitViewMaximumPanesExceeded`, `splitViewTargetOutOfRange`,
   `unableToInsertSplitViewContainer`, `missingSplitViewContainer`; `ModalParentSplitState { parentIsSplitCompatible,
-  numberOfPanels, maximumNumberOfPanels, layoutOrientation }`. [I] Max is 4 panes (shortcuts stop at "fourth").
+numberOfPanels, maximumNumberOfPanels, layoutOrientation }`. [I] Max is 4 panes (shortcuts stop at "fourth").
   Toolbar `shouldShowSplitViewClose` only in a split; `maximizeCurrentSplitViewPane:` exists (notification token).
 
 ### Sidebar cell
+
 - [O] `SplitViewCellView: SelectableCellView<SplitViewCellState>` with `SplitViewCellState { sidebarItemID,
-  isCurrentItem, isContentVisible, isKeyDraggedItem, isHighlighted, isMultiSelected, shouldDim, canResetTab,
-  layoutStyle: .childItems(OrderedDictionary<id, ChildItemState>) | .customInfo(CustomInfo), colorPalette,
-  closeItemShortcut, lastUpdatedLocally, hasLeadingRecordingIndicator, dropTargetRegion?, closeButtonConfiguration,
-  closeButtonAction, shouldPerformUserAttentionAnimation }`. `ChildItemState { itemID, iconType: FaviconType?,
-  title, isGroupSelected, isRecording, closeButtonConfiguration, optionClickSplitTabCloseButtonToUnsplitEnabled,
-  newSplitSeparationMechanismsEnabled }`. `CustomInfo { title, isEditingTitle, icon: .childItemCount(Int) |
-  .customIcon(SidebarCustomIcon) }`.
+isCurrentItem, isContentVisible, isKeyDraggedItem, isHighlighted, isMultiSelected, shouldDim, canResetTab,
+layoutStyle: .childItems(OrderedDictionary<id, ChildItemState>) | .customInfo(CustomInfo), colorPalette,
+closeItemShortcut, lastUpdatedLocally, hasLeadingRecordingIndicator, dropTargetRegion?, closeButtonConfiguration,
+closeButtonAction, shouldPerformUserAttentionAnimation }`. `ChildItemState { itemID, iconType: FaviconType?,
+title, isGroupSelected, isRecording, closeButtonConfiguration, optionClickSplitTabCloseButtonToUnsplitEnabled,
+newSplitSeparationMechanismsEnabled }`. `CustomInfo { title, isEditingTitle, icon: .childItemCount(Int) |
+.customIcon(SidebarCustomIcon) }`.
 - [O] Views: `SplitViewCellChildrenContainerView` (one `SplitViewCellChildItemView` per tab, `separatorLayers:
-  [CALayer]` between them, `isGroupHovered`, `InsetSpec { defaultInset, extendedInset }`), each child with
+[CALayer]` between them, `isGroupHovered`, `InsetSpec { defaultInset, extendedInset }`), each child with
   favicon + title + its own close button and recording dot; renamed splits show `SplitViewCellCustomInfoView`
   (icon or item-count badge `SplitViewCellItemCountIconView`, editable title, hover subtitle). Icons:
-  icon-split-add-left/right/top/bottom, icon-split-horizontal/vertical, icon-split-move-*, icon-separate-from-split,
-  icon-split-share-*, icon-split-x; colour asset SplitViewLeftBackground.
+  icon-split-add-left/right/top/bottom, icon-split-horizontal/vertical, icon-split-move-_, icon-separate-from-split,
+  icon-split-share-_, icon-split-x; colour asset SplitViewLeftBackground.
 
 ### Plan for Cra (design, not observation)
+
 1. Model: add `ItemData.split(SplitData)` to SidebarModel with `widthFactors: [UUID: Double]`,
    `orientation`, `focusTabID`; children = the pane tabs (reuse `childrenIds`/`parentID` like folders). Store
    per-window `splitState { paneTabIDs, focusedTabID }` in WindowPrefs; rebuild widths from the item.
@@ -445,6 +463,7 @@ it docks the frontend itself, which CEF does not allow for these windows).
 
 Measured with `screencapture -l<id>` of Arc's main window against Cra's shell window at the
 same 1728×1084 frame, probing pixel runs at 2x:
+
 - Content card: 10 pt inset (card top at y=20 px), corner fits a circular 12 px radius
   → `contentCornerRadius` 6 pt (was 10). The card starts at the sidebar's right edge with
   no gap; Victor's Arc sidebar was 284 pt wide in this capture.
@@ -474,6 +493,7 @@ Window 1688×1010 (Victor's size), corners 10pt. One 46pt strip, no sidebar, pag
 edge below it. Colours are the default profile's dark palette even with the light "Victor"
 space focused (bar #0C091C = JYSK's toolbar colour, so the strip is theme-derived but not
 from the focused space; Cra uses the measured values as a fixed palette):
+
 - traffic lights at x 17/39/61, 12pt muted grey discs (#565660) that colour only while the
   pointer is over them;
 - search pill x 83 → 10pt before the button, y 8…38 (30pt, radius 8), fill #252234, hover
@@ -513,16 +533,17 @@ Victor's side-by-side screenshots (Cra and Arc both at 1728×1084, each with the
 browser behind it) showed Cra's sidebar 6–17/255 darker and more saturated than Arc's at
 every height except the very top, and Cra's row text pure black where Arc's is warm.
 Sampled at x=500 px (2x), y = 160 / 700 / 1200 / 1700:
+
 - Arc live: 134 131 98 · 149 139 102 · 151 136 99 · 163 139 103
 - Cra before (lift 0.03): 128 121 86 · 137 125 89 · 143 127 91 · 146 126 90
 - Cra after (lift 0.12): 139 134 100 · 152 141 106 · 160 143 108 · 162 141 108
-Changes: `CraTuning.liftActive` 0.03 → 0.12; light-theme `textPrimary` = first theme colour
-at 13.5 % brightness (`SpaceTheme.inkColor`, Victor → 33/28/11; Arc samples 32/26/0);
-`textSecondary` black 0.58 → 0.50 (Arc's space header samples 75/74/57 over 150/138/100).
-Folders: Arc draws `folder.fill` in the theme colour pulled 80 % to white (250/238/194)
-under a `folder` outline in the toolbar colour (107/87/9); the old blue folder was wrong
-for this theme. The blur reads ~70/255 lighter for the first second after launch (vibrancy
-not yet active), so sample only after the window has settled.
+  Changes: `CraTuning.liftActive` 0.03 → 0.12; light-theme `textPrimary` = first theme colour
+  at 13.5 % brightness (`SpaceTheme.inkColor`, Victor → 33/28/11; Arc samples 32/26/0);
+  `textSecondary` black 0.58 → 0.50 (Arc's space header samples 75/74/57 over 150/138/100).
+  Folders: Arc draws `folder.fill` in the theme colour pulled 80 % to white (250/238/194)
+  under a `folder` outline in the toolbar colour (107/87/9); the old blue folder was wrong
+  for this theme. The blur reads ~70/255 lighter for the first second after launch (vibrancy
+  not yet active), so sample only after the window has settled.
 
 ### Picture in Picture (24 Oct, late evening)
 
@@ -532,7 +553,7 @@ Arc's PiP window driven with synthetic mouse events (file:// test page, w3school
 the Extensions ▸ Picture in Picture menu item and the page's own `requestPictureInPicture()`).
 
 - [O] Arc wraps Chromium's video PiP: ArcCore has `arc::VideoPiPCoordinatorImpl(content::
-  VideoPictureInPictureWindowController*)`, the Swift `PictureInPicture` module has
+VideoPictureInPictureWindowController*)`, the Swift `PictureInPicture` module has
   PIPWindowController/PIPWindowContent/PIPOverlayHostView, Controls with PlayControls and
   MeetingControls view models, DocumentPiPWindowController for document PiP, and
   WindowState+GoogleMeetAutoPiP (injected JS that clicks Meet's own PiP menu item).
@@ -596,6 +617,7 @@ has no H.264/AAC. Cra now ships its own CEF build with them; see docs/release.md
 
 Window captures of Arc's main window while driving it (menu clicks, synthetic drags), compared with Cra's
 isolated test instance; composites in docs/screenshots/compare-*.png.
+
 - [O] "Add Split View" on a selected tab: the new empty pane appears fully laid out within one frame (window
   frames at 27 fps); the command bar fades in over the new pane, horizontally centred on it but kept inside the
   window (right margin ~80 pt), with Arc's "Search or Enter URL…" new-tab bar, not the edit-URL bar.
@@ -686,6 +708,7 @@ Method: a renamed copy of build/Cra.app (`CraVis`, own `CRA_DATA_DIR` with Victo
 launched from the shell with `CRA_TUNING="lift=…&alpha=…&alphaTop=…&alphaBottom=…&material=N"`,
 a full-screen solid window ordered directly behind the measured window, `screencapture -R`
 of the sidebar strip, pixel runs at x=500 px (2x), y = 160/700/1200/1700/2100.
+
 - Arc 1.170, Victor theme — white: 204/197/164 · 215/208/167 · 218/201/160 · 219/193/159 ·
   218/188/154; black: 123/116/83 · 139/124/90 · 146/129/89 · 154/128/94 · 159/129/95.
   So Arc = c + k·backdrop with k 0.32 (top) → 0.23 (bottom).
@@ -722,6 +745,7 @@ of the sidebar strip, pixel runs at x=500 px (2x), y = 160/700/1200/1700/2100.
   under the confetti puff.
 
 ### Sidebar scrolling (Arc 1.170, 25 Oct 2026, AX tree + window-id captures)
+
 - [O] Only the space's tab list scrolls. The AX tree puts favorites (window y 36–99) and the space page
   (y 99+, a 568pt-wide horizontal pager group) side by side; inside the page the header row (y 99–135) sits
   above an `AXScrollArea` 284×899 at y 135–1034 that holds the `sidebarAllTabList` outline. Scrolling it
@@ -746,6 +770,7 @@ of the sidebar strip, pixel runs at x=500 px (2x), y = 160/700/1200/1700/2100.
   Arc 34 with 45 at rows 84–85 (Cra's line sits inside the 32 pt strip, Arc's just under it).
 
 ### Closing vs removing pinned tabs (Arc 1.170, 27 Oct 2026, field metadata + live hover recordings)
+
 - [O static] `SharedWindowFeature.SidebarCellCloseButtonConfiguration { action, tooltip: String }` with
   `Action { deselect, close, unsplit }`; the tab cell state carries it as an optional, next to `canResetTab`,
   `resetTabTitle`, `resetTabIcon`, `closeItemShortcut`, `resetItemShortcut` and
@@ -765,9 +790,9 @@ of the sidebar strip, pixel runs at x=500 px (2x), y = 160/700/1200/1700/2100.
   `archiveTab`. Context menu: "Close and Keep Pinned" (only when open/loaded) and "Archive Tab". The URL
   tooltip moved from the row to the title so the buttons' tooltips show. No attention ring yet.
 - Tooltips on these buttons (ArcTooltip module, field metadata): `ArcTooltipConfiguration { content,
-  keyboardShortcut, preferredAnchor: .view(edge) | .cursor, presentationBehavior: .onMouseIdle(delay) |
-  .immediate, maxWidth, colorPalette }`, `TooltipController { presentationTimer, lastTooltipDismissedAtTime,
-  … }`. [O live, 1x recordings] Shown 1.60 s after the pointer's last move (two cases, 30 fps); moving
+keyboardShortcut, preferredAnchor: .view(edge) | .cursor, presentationBehavior: .onMouseIdle(delay) |
+.immediate, maxWidth, colorPalette }`, `TooltipController { presentationTimer, lastTooltipDismissedAtTime,
+… }`. [O live, 1x recordings] Shown 1.60 s after the pointer's last move (two cases, 30 fps); moving
   straight from one tip to another control swaps at once; pops in with no fade, fades out in ~2 frames.
   Navy capsule 28 pt, no visible border, 12 pt medium text (fill 96 for "Canteen plan", 110 for
   "Archive this tab", 198 for "Close and Keep Pinned ⌘W"), 10 pt side padding, 7 pt text→caps, caps
@@ -818,12 +843,13 @@ Raw layer response over the same solid backdrops: black 6, white 240 (passes 92 
 Model: out = a·G + (1−a)·[L·255 + (1−L)(1−D)·blur]. Baked: D 0.23, L 0.21 (top) → 0.18
 (bottom), gradient opacity intensity×1.65 (0.42) → ×2.30 (0.58). Measured on the baked
 build, five heights, R/G/B:
+
 - white — Arc 204/197/164 · 215/208/167 · 218/201/160 · 219/193/159 · 218/188/154;
   Cra 201/196/165 · 213/202/168 · 219/203/167 · 218/198/161 · 217/193/156.
 - black — Arc 123/116/83 · 139/124/90 · 146/129/89 · 154/128/94 · 159/129/95;
   Cra 126/121/90 · 140/129/95 · 149/133/97 · 154/134/97 · 155/131/94.
-Every channel within 8 levels, red within 4, at every height over both backdrops.
-`CRA_TUNING` keys for the path: `dim`, `lift`, `liftBottom`, `alphaTop`, `alphaBottom`.
+  Every channel within 8 levels, red within 4, at every height over both backdrops.
+  `CRA_TUNING` keys for the path: `dim`, `lift`, `liftBottom`, `alphaTop`, `alphaBottom`.
 - Baked constants after the last fit: dim 0.19, lift 0.16 → 0.18, gradient opacity
   intensity×1.70 (0.43) → ×2.35 (0.59). Measured (c7 run): white 207/202/169 · 217/206/171 ·
   217/201/165 · 218/198/162; black 125/120/87 · 138/127/92 · 143/127/91 · 152/132/96 at
@@ -873,6 +899,7 @@ that fades in over 0.15 s when the pointer enters and out over 0.25 s when it le
 froze 5 frames after the click), back to tab brings the source window up and returns the video.
 Captures: build/pip-verification/cra_ctrl_*.png. To be calibrated against a capture of Arc's
 hovered PiP.
+
 - Inactive window (25 Oct, 12:10): Arc drops the backdrop and shows a flat 149/143/104 regardless
   of what is behind. Cra used to switch to a 0.75 white lift (244/234/199 over white, 211/201/166
   over black), which made the sidebar flip between dark-translucent and pale on every app switch.
@@ -928,6 +955,7 @@ opened from Dia ▸ Import from Another Browser… (stopped before "Begin Import
 Source of `SystemIntegration`, the onboarding's `.defaultBrowser` step and Settings ▸ General.
 Static only: strings and `__swift5_fieldmd` of `Dia.app/Contents/MacOS/Dia`, art from
 `BoostBrowser_Unboxing.bundle` (`Bundle.image(forResource:)`); Dia's onboarding was not re-run.
+
 - [O] Arc app menu (user screenshot): Settings… ⌘, / Share Arc / Set as Default Browser with ⌘♡
   as its key equivalent (no key types ♡), then a separator before Import from Another Browser….
 - [O] Dia's onboarding `Flow` enums list `newDefaultBrowser` ahead of `disclosure`, `import` and
@@ -958,8 +986,8 @@ scratch `fieldmd.py`), its localization strings, and the SQLite/Keychain layout 
 browsers on this Mac read read-only. Dia's onboarding itself was not re-run past the browser step.
 
 - [O] Dia's onboarding `Flow` order: `newDefaultBrowser, connectedApps, atlassianFirstParty,
-  disclosure, import, importProgress, importPasswordsAndCookiesResult, pinnedTabs, personalization,
-  safariExportedData, extensions, outro` (`OnboardingStepName` adds welcome/auth/account). Cra runs:
+disclosure, import, importProgress, importPasswordsAndCookiesResult, pinnedTabs, personalization,
+safariExportedData, extensions, outro` (`OnboardingStepName` adds welcome/auth/account). Cra runs:
   cover → default browser → privacy (disclosure) → import (source → Safari export / unlock → spaces →
   extensions → progress → passwords result) → pinned tabs → personalization → outro. Cra drops Dia's
   AI-tied steps (connected apps, Atlassian, ChatGPT memory opt-in, the "try for a week" trial).
@@ -1021,6 +1049,7 @@ browsers on this Mac read read-only. Dia's onboarding itself was not re-run past
 ## Dia nav-bar status (Dia 1.54.2, 25 Oct 2026)
 
 Static only (strings of `Dia.app/Contents/MacOS/Dia`, no decompiler; not observed at runtime).
+
 - Dia confirms browser actions inside the navigation bar instead of a toast: the status view
   (`NavigationBar.AssistantBarStatusView`) takes the title/URL slot, e.g. "🔗 Copied Current URL"
   (user screenshot). Localisation comments call these "Nav-bar status" and ship Title Case and
@@ -1057,7 +1086,7 @@ options page. Pin Extensions… is a checklist submenu backed by `ExtensionStore
   bar's Extensions menu under the button, Split View → addSplitView).
 - Running an action (CEF 154 has no extension API): `Extensions.triggerAction` over a private
   `--remote-debugging-pipe` (fd 3/4 held by Cra, `--enable-unsafe-extension-debugging`; CEF's own
-  per-browser DevTools client gets "Method not allowed"). It needs the *tab* target (page →
+  per-browser DevTools client gets "Method not allowed"). It needs the _tab_ target (page →
   tab via `Target.attachToTarget` + `setAutoAttach` on each tab target) and a Chrome toolbar:
   with `CEF_CTT_NONE` Chromium segfaults (null extensions container), so page windows get
   `CEF_CTT_NORMAL` with the toolbar view hidden (`CRA_NO_CHROME_TOOLBAR=1` opts out). Chrome's
@@ -1094,7 +1123,9 @@ search results) or cosmetic ad slots; requests from service workers and extensio
 (no browser) are not filtered.
 
 ## Dia space paging and window buttons (Dia 1.54.2, 25 Oct 2026, static only)
+
 [O] = read from the binary, [I] = inferred, not observed running.
+
 - [O] Swift field metadata: `ARCUI.PageSwipeController` (pages with widths, `pageOrigins`,
   `trackingState {isTracking, isAnimating}`, `scrollingShouldBeginHandler(NSEvent)`, `positionUpdateHandler`,
   `PagingPosition {floorPageID, ceilPageID, progress}`, `performsPageDetentHaptics`, `lastDetentPageID`,
@@ -1104,7 +1135,7 @@ search results) or cosmetic ad slots; requests from service workers and extensio
   `ARCUI.VelocityTracker {value, pastValues}` measures release speed.
 - [O] `TabSidebar.PagingContainerViewController`: one `NSViewController` page per space in a horizontal
   `pagingContentView`, loaded lazily (`loadedPages`, `isPageCleanupScheduled`). `SpaceModels.SpacePagingTransition
-  {fromSpaceID, toSpaceID, progress}` drives the window tint (`SpacePagingTintSettlingAnimation` keyframes colours).
+{fromSpaceID, toSpaceID, progress}` drives the window tint (`SpacePagingTintSettlingAnimation` keyframes colours).
   `PendingRubberBandSnapBack`/`RubberBandDragState` exist for the edges.
 - [O] No `trackSwipeEvent` use: Dia reads raw scroll events. It imports `SwiftUI.Spring(duration:bounce:)` and
   `Spring.update(value:velocity:target:deltaTime:)`; the one sampler found passes `bounce: 0`, but its callers are
@@ -1225,6 +1256,7 @@ the arm64 slice. [O] = observed, [I] = inferred.
   page marks where the address bar sits.
 
 ## Software updates (Arc 1.170, 26 Oct 2026, static + one live check)
+
 - [O] Arc bundles Sparkle 2.9.4 (Frameworks/Sparkle.framework, CFBundleShortVersionString 2.9.4). Info.plist:
   `SUFeedURL` https://releases.arc.net/updates.xml, `SUPublicEDKey` (EdDSA-signed archives), `SUEnableAutomaticChecks`,
   `SUAutomaticallyUpdate` (download in the background), `SUScheduledCheckInterval` 28800 (8 h). No `SURequireSignedFeed`.
@@ -1284,15 +1316,15 @@ the arm64 slice. [O] = observed, [I] = inferred.
   28 pt below. Destination menu: disabled header "Open in Space", "Most Recent Space", every space (emoji + title),
   separator, "Little Arc". New Route appends `Contains`, empty, Most Recent Space at the bottom.
 - [O] Storage `StorableLinkRouting.json`: `{rules: [{id, sourceComponents: [{id, componentType: {urlMatch: {_0:
-  {contains: {}} | {matches: {}}, _1: "meet.google.com"}}}], destination}], defaultDestination, version: 1}` with
+{contains: {}} | {matches: {}}, _1: "meet.google.com"}}}], destination}], defaultDestination, version: 1}` with
   destinations `{space: {_0: {mostRecent: {}}}}` and `{littleArc: {_0: {mostRecent: {}}}}` (the inner value is the
   profile). Swift types: LinkMatchingRule, LinkSourceComponent.ComponentType (only `urlMatch`),
   LinkSourceTextMatchingStyle, LinkDestination, ProfileDestination. Arc seeds a meet.google.com route
   (`didSetDefaultGoogleMeetRoute`).
-- [O] "Links from other apps open in Little Arc" *is* the default destination: switching it off rewrote
+- [O] "Links from other apps open in Little Arc" _is_ the default destination: switching it off rewrote
   defaultDestination to `space(mostRecent)`, on to `littleArc`.
 - [O] Swift metadata (`__swift5_fieldmd`, arm64 slice): `LinkDestination = space(ProfileDestination) |
-  littleArc(ProfileDestination)`, `ProfileDestination = mostRecent | space(UUID) | profile(…)`, so a specific space is
+littleArc(ProfileDestination)`, `ProfileDestination = mostRecent | space(UUID) | profile(…)`, so a specific space is
   stored as `{space: {_0: {space: {_0: "<space id>"}}}}`. `LinkMatchingRule {id, sourceComponents, destination}`,
   `LinkSourceComponent.ComponentType = urlMatch(LinkSourceTextMatchingStyle, String)`, style `matches | contains`.
   Only `Arc.AppReducer` and `Arc.WindowsReducer` hold the LinkRoutingClient (routing happens where URLs are opened).
@@ -1302,18 +1334,18 @@ the arm64 slice. [O] = observed, [I] = inferred.
   meet.google.com → Most Recent Space route once.
 - [O] Runtime (26 Oct 2026, temporary routes written to StorableLinkRouting.json while Arc was quit, links handed over
   with `open -g -a Arc <url>`, landing read from the AX tree and StorableSidebar.json, file restored afterwards):
-  - Both the URL and the route text lose case, the scheme and a leading `www.` before comparing: "Contains
-    https://example.com/atc-scheme" matched `http://example.com/…` and `https://www.example.com/…`; "Contains
-    ATC-CASE" matched `/atc-case`.
-  - "Contains" also sees the query and fragment (`?x=atc-order`, `#atc-recent` matched).
-  - "Is equal to" compares host and path only: `example.com/atc-eq` matched `…/atc-eq?x=1`, `…/atc-eq#frag`,
-    `http://`, `www.`, upper case and a trailing slash, but not `…/atc-eq/more`.
-  - Routes are checked in order; the first match wins. No match → the default (Little Arc).
-  - A space destination opens a new foreground tab at the top of that space's Today list (a second copy when the URL
-    is already open) and switches the main window to the space. Most Recent Space = the space the main window last
-    showed.
-  - `littleArc(space(JYSK))` opened a Little Arc whose button read "Open in Victor" (the most recent space); the
-    editor shows that destination blank. The payload only picks a profile.
+    - Both the URL and the route text lose case, the scheme and a leading `www.` before comparing: "Contains
+      https://example.com/atc-scheme" matched `http://example.com/…` and `https://www.example.com/…`; "Contains
+      ATC-CASE" matched `/atc-case`.
+    - "Contains" also sees the query and fragment (`?x=atc-order`, `#atc-recent` matched).
+    - "Is equal to" compares host and path only: `example.com/atc-eq` matched `…/atc-eq?x=1`, `…/atc-eq#frag`,
+      `http://`, `www.`, upper case and a trailing slash, but not `…/atc-eq/more`.
+    - Routes are checked in order; the first match wins. No match → the default (Little Arc).
+    - A space destination opens a new foreground tab at the top of that space's Today list (a second copy when the URL
+      is already open) and switches the main window to the space. Most Recent Space = the space the main window last
+      showed.
+    - `littleArc(space(JYSK))` opened a Little Arc whose button read "Open in Victor" (the most recent space); the
+      editor shows that destination blank. The payload only picks a profile.
 - [U] what several conditions in one rule mean (any vs all; the UI never creates them), the ⓘ help article URL
   (built at run time, `featuresForLinkRouting`), the empty-list state.
 - Cra: `Model/LinkRouting.swift` (Arc's matching above, checked against every observed case; first match wins; the
@@ -1347,23 +1379,23 @@ Arc's popup this time, so geometry is not measured.
   nightly builds, Bitwarden, Dashlane, LastPass, iCloud Passwords, Keeper, RoboForm, NordPass), plus a hard-coded
   `chrome-extension://pejdijmoenmkgeppbflobdenhhabjlaj/page_popup.html?popupWindow=1` ([I] iCloud Passwords).
 - Cra (Chromium side, observed with a probe extension and the DevTools port):
-  - CEF creates every `CefBrowserView` browser as `TYPE_POPUP` (trusted). To extensions every Cra tab therefore
-    sits in a `"popup"` window (`windows.getAll()` returns only popups), and `chrome.action.openPopup()` fails with
-    "Browser window has no toolbar." (`PopupBrowserSupportsWindowFeature(kFeatureToolbar)` is false). 1Password
-    calls `openPopup()` from its inline menu and checks `windows.getCurrent().type === "popup"`; its
-    `windows.onCreated` handler treats every new Cra tab as a sign-in popup from the previous tab.
-    `scripts/cef-patches/extensions-normal-windows.patch` reports `IsViewsHosted()` browsers as `"normal"` and lets
-    them open popups (needs a CEF build; not in the CEF 154 codecs1 build).
-  - `windows.create({type: "popup"})` used to become a Cra tab (StrayBrowserClient). Chrome gives tabbed windows
-    `NSWindowStyleMaskFullSizeContentView` (BrowserNativeWidgetMac::PopulateCreateWindowParams) and popups a plain
-    titled window, so Cra now keeps the latter as Chrome's own window (`+[CraCEFRuntime isExtensionWindow:]`, ⌘W
-    closes it). The window does not exist yet in OnAfterCreated (GetWindowHandle is nil); it does by OnBeforeBrowse.
-  - Popups Cra did not open itself (shortcut, `openPopup()`) are found through `Target.setDiscoverTargets`: the
-    target is created as `"other"` with no URL and gets the popup URL in `targetInfoChanged`; Chrome creates the
-    bubble window hidden before that, so placement looks for a newly *visible* borderless window. Without this the
-    popup hangs off Chrome's hidden toolbar (x ≈ 174 pt from the left).
-  - [U] Not reproduced from Arc: the popup window's chrome (shadow, corner radius, drag handle) and where it reopens
-    after being dragged; Cra still uses Chrome's bubble.
+    - CEF creates every `CefBrowserView` browser as `TYPE_POPUP` (trusted). To extensions every Cra tab therefore
+      sits in a `"popup"` window (`windows.getAll()` returns only popups), and `chrome.action.openPopup()` fails with
+      "Browser window has no toolbar." (`PopupBrowserSupportsWindowFeature(kFeatureToolbar)` is false). 1Password
+      calls `openPopup()` from its inline menu and checks `windows.getCurrent().type === "popup"`; its
+      `windows.onCreated` handler treats every new Cra tab as a sign-in popup from the previous tab.
+      `scripts/cef-patches/extensions-normal-windows.patch` reports `IsViewsHosted()` browsers as `"normal"` and lets
+      them open popups (needs a CEF build; not in the CEF 154 codecs1 build).
+    - `windows.create({type: "popup"})` used to become a Cra tab (StrayBrowserClient). Chrome gives tabbed windows
+      `NSWindowStyleMaskFullSizeContentView` (BrowserNativeWidgetMac::PopulateCreateWindowParams) and popups a plain
+      titled window, so Cra now keeps the latter as Chrome's own window (`+[CraCEFRuntime isExtensionWindow:]`, ⌘W
+      closes it). The window does not exist yet in OnAfterCreated (GetWindowHandle is nil); it does by OnBeforeBrowse.
+    - Popups Cra did not open itself (shortcut, `openPopup()`) are found through `Target.setDiscoverTargets`: the
+      target is created as `"other"` with no URL and gets the popup URL in `targetInfoChanged`; Chrome creates the
+      bubble window hidden before that, so placement looks for a newly _visible_ borderless window. Without this the
+      popup hangs off Chrome's hidden toolbar (x ≈ 174 pt from the left).
+    - [U] Not reproduced from Arc: the popup window's chrome (shadow, corner radius, drag handle) and where it reopens
+      after being dragged; Cra still uses Chrome's bubble.
 
 ## Site Control Center and pinned extensions (Arc 1.170, 26 Oct 2026, live via AX + captures)
 
@@ -1427,6 +1459,7 @@ ObjC metadata: `DownloadToLibrary.ViewModel` (_downloads, _binPositionX, windowS
 animationGroup), `DownloadViewModel` (source, destination, _projectileIconKeyframeAnimation, _iconOffsetX,
 iconOffsetXAnimator, iconBounceAnimator, lazy g / vx0 / vy0 / projectileMotionDuration / apex / apexTime),
 `WindowController` (parentWindow, dismiss, isAnimating): a window over the browser window. Measured (window 1728×1084):
+
 - Source is the pointer (logged with `cliclick p` every 30 ms): the glyph launched at the pointer; with the pointer off
   to the right of the window it entered from the window's edge. Destination is the bin.
 - Projectile: constant horizontal speed (−1232 pt/s on a 1361 pt run, every frame within ~10 pt), apex 90 pt above

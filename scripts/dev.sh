@@ -37,6 +37,13 @@ bootstrap() {
   cp -R "$ROOT/vendor/cef/Release/Chromium Embedded Framework.framework" "$APP/Contents/Frameworks/"
   find "$fw/Libraries" -name '*.dylib' -exec codesign --force --sign - {} \; 2>/dev/null
   codesign --force --sign - "$fw"
+  # As in scripts/build.sh: Cra links Sparkle, and its XPC services are only for sandboxed apps.
+  local sparkle="$APP/Contents/Frameworks/Sparkle.framework"
+  ditto "$ROOT/vendor/sparkle/Sparkle.framework" "$sparkle"
+  rm -rf "$sparkle/Versions/B/XPCServices" "$sparkle/XPCServices"
+  codesign --force --sign - "$sparkle/Versions/B/Autoupdate"
+  codesign --force --sign - "$sparkle/Versions/B/Updater.app"
+  codesign --force --sign - "$sparkle"
   for entry in "${HELPERS[@]}"; do
     local ns="${entry%%|*}" ps="${entry#*|}"
     local helper="$APP/Contents/Frameworks/$NAME Helper$ns.app"
@@ -55,7 +62,9 @@ build() {
   swift build -c debug --scratch-path "$SCRATCH" || return 1
   local bin
   bin="$(swift build -c debug --scratch-path "$SCRATCH" --show-bin-path)"
-  [ -d "$APP/Contents/Frameworks/$NAME Helper.app" ] || bootstrap
+  # Bundles from before Sparkle was copied here (or a bootstrap that stopped halfway) get redone.
+  [ -d "$APP/Contents/Frameworks/$NAME Helper.app" ] && [ -d "$APP/Contents/Frameworks/Sparkle.framework" ] \
+    || bootstrap
   for entry in "${HELPERS[@]}"; do
     local ns="${entry%%|*}"
     local helper="$APP/Contents/Frameworks/$NAME Helper$ns.app"
@@ -95,6 +104,7 @@ changed() {
 }
 
 scripts/fetch-cef.sh >/dev/null
+scripts/fetch-sparkle.sh >/dev/null
 trap 'stop; exit 0' INT TERM
 trap stop EXIT
 

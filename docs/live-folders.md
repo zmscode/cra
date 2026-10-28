@@ -9,6 +9,7 @@ Cra's own requests. No decompiler on this Mac, so no control flow was read.
 Legend: [O] observed, [I] inference, [U] unknown.
 
 ## Where the code lives in Arc and Dia
+
 - [O] Both ship the same client, `Frameworks/ARCClients/Sources/GitHubClient/GitHubClient.swift`
   and `GitHubClient+PullRequestsParsing.swift`. Arc's folder model is `LiveFoldersFeature/StorableLiveData.swift`.
   Dia's is `BoostBrowser/Sources/LiveFolders/` (`LiveFolderManager`, `LiveFolderController`,
@@ -32,9 +33,10 @@ Legend: [O] observed, [I] inference, [U] unknown.
   organizations' PRs appear", "Login with SSO to unlock this folder".
 
 ## Arc's stored model (Victor's real folder)
+
 - [O] StorableSidebar.json, a `list` item titled "Pull Requests" in the JYSK space's pinned container:
   `automaticLiveFolderData { dataSource: {github: {}}, filter: {github: {attributes: 7, hiddenRepositories:
-  [{owner, name, provider}]}}, hiddenItems: [{url}], lastFetch: {timestamp, status: {success}} }`,
+[{owner, name, provider}]}}, hiddenItems: [{url}], lastFetch: {timestamp, status: {success}} }`,
   `customInfo.iconType.icon = "github"`.
 - [O] Its children are ordinary tabs with `liveItemID.url` = the pull request URL; `savedTitle` is the pull
   request's title (not the page title), new ones arrive `isUnread: true`, a tab's `createdAt` is the pull
@@ -42,13 +44,14 @@ Legend: [O] observed, [I] inference, [U] unknown.
 - [O] `hiddenItems` holds pull requests that are still open and awaiting review but no longer in the folder:
   closing a tab out of the folder keeps it out.
 - [O] StorableLiveData.json caches each item: `github.pullRequest {author, number, repo{owner,name,provider},
-  title, status {open|merged: date}, reviewStatus, isAwaitingMyReview, createdByMe, hasKnownStackMembership, updatedAt}`.
+title, status {open|merged: date}, reviewStatus, isAwaitingMyReview, createdByMe, hasKnownStackMembership, updatedAt}`.
 - [I] `attributes` bits: 1 = authored, 2 = review requests to you, 4 = team review requests ("Team Review
   Requests" is a string beside `hiddenRepositories`; 7 = all three, matching Dia's three queries).
 - [U] Arc's refresh interval: it reads `automatic-live-folders-min-refresh-interval-in-seconds` from a remote
   flag whose value isn't cached on this Mac.
 
 ## Dia's refresh timing
+
 - [O] Dia's LaunchDarkly cache (~/Library/Preferences/com.launchdarkly.client.X35+6+…plist, 27 Oct 2026):
   `github-live-folder-min-refresh-interval-seconds` 120, `github-live-folder-post-merge-retention-seconds` 120,
   `github-live-folder-post-review-retention-seconds` 120, `github-live-folder-json-api-enabled` true,
@@ -67,6 +70,7 @@ Legend: [O] observed, [I] inference, [U] unknown.
   Dia probably subscribes to those; no socket code was found in its strings, so this is unconfirmed.
 
 ## Arc's folder on screen (captured 27 Oct)
+
 - [O] Folder row: Arc's usual folder glyph in the space's folder colours with GitHub's mark on its front;
   title bold like other folders. A 26×26 trailing button showed a ⚠ that stayed on hover (the folder was in
   an error state; the healthy state's button was not seen).
@@ -77,6 +81,7 @@ Legend: [O] observed, [I] inference, [U] unknown.
   "Delete your %@ Live Folder?". Not in Arc's menu bar (only a debug menu "Automatic Live Folders").
 
 ## What Cra does
+
 - Fetch: `+[CraCEFRuntime fetchURL:headers:profilePath:completion:]`, a browser-side `CefURLRequest` on the
   space's profile, so it carries that profile's cookies. GitHubLiveClient runs one search per enabled
   filter: `/pulls?q=…` with the JSON headers first, `/search?type=pullrequests` when that gives nothing it
@@ -93,6 +98,7 @@ Legend: [O] observed, [I] inference, [U] unknown.
   Folder" in the sidebar menus and command bar). Not copied: Dia's realtime updates (see below).
 
 ## Verified (27 Oct 2026)
+
 - GitHub's answers when signed out: `/pulls` with the JSON headers returns 404 `{"error":"Couldn’t authenticate you"}`;
   `/search?type=pullrequests` returns 200 JSON `payload.blackbirdSearchRoute` with `"logged_in":false`. Both
   read as "not signed in"; the test instance showed "Sign back in to GitHub." and the warning button.

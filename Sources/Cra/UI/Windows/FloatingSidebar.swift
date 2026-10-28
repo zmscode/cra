@@ -11,282 +11,315 @@ import SwiftUI
 /// events in every window of the app decides when it comes and goes.
 @MainActor
 final class FloatingSidebarController {
-    unowned let shell: ShellView
-    unowned let window: NSWindow
-    /// Whether the anchored sidebar is hidden right now (floating only makes sense then).
-    var sidebarHidden: () -> Bool = { false }
-    var palette: () -> SpacePalette
-    /// Called after the panel is attached so the overlay panel can be re-ordered above it.
-    var didAttachPanel: (() -> Void)?
+	unowned let shell: ShellView
+	unowned let window: NSWindow
+	/// Whether the anchored sidebar is hidden right now (floating only makes sense then).
+	var sidebarHidden: () -> Bool = { false }
+	var palette: () -> SpacePalette
+	/// Called after the panel is attached so the overlay panel can be re-ordered above it.
+	var didAttachPanel: (() -> Void)?
 
-    private(set) var isShown = false
-    private var panel: FloatingSidebarPanel?
-    /// The sidebar's rounded body; it slides inside the panel (see `panelFrame`).
-    private let slider = NSView()
-    private let blur = NSVisualEffectView()
-    private let lift = NSView()
-    private var gradientHost: NSHostingView<SpaceBackground>?
-    private var trafficLights: FloatingTrafficLights?
+	private(set) var isShown = false
+	private var panel: FloatingSidebarPanel?
+	/// The sidebar's rounded body; it slides inside the panel (see `panelFrame`).
+	private let slider = NSView()
+	private let blur = NSVisualEffectView()
+	private let lift = NSView()
+	private var gradientHost: NSHostingView<SpaceBackground>?
+	private var trafficLights: FloatingTrafficLights?
 
-    enum Metrics {
-        static let edge: CGFloat = 2
-        static let leaveSlack: CGFloat = 24
-        static let cornerRadius: CGFloat = 12
-        static let margin: CGFloat = 8
-        static let duration: TimeInterval = 0.085
-    }
+	enum Metrics {
+		static let edge: CGFloat = 2
+		static let leaveSlack: CGFloat = 24
+		static let cornerRadius: CGFloat = 12
+		static let margin: CGFloat = 8
+		static let duration: TimeInterval = 0.085
+	}
 
-    init(shell: ShellView, window: NSWindow, palette: @escaping () -> SpacePalette) {
-        self.shell = shell
-        self.window = window
-        self.palette = palette
-    }
+	init(shell: ShellView, window: NSWindow, palette: @escaping () -> SpacePalette) {
+		self.shell = shell
+		self.window = window
+		self.palette = palette
+	}
 
-    deinit {
-        poll?.invalidate()
-    }
+	deinit {
+		poll?.invalidate()
+	}
 
-    private var poll: Timer?
+	private var poll: Timer?
 
-    /// No window of ours reliably receives mouse-moved events here: the key window
-    /// is usually a Chromium page window, and the shell's tracking areas only run in
-    /// the key window. So the pointer is sampled on a timer while the app is active.
-    func install() {
-        guard poll == nil else { return }
-        poll = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.pointerMoved() }
-        }
-        poll?.tolerance = 0.01
-    }
+	/// No window of ours reliably receives mouse-moved events here: the key window
+	/// is usually a Chromium page window, and the shell's tracking areas only run in
+	/// the key window. So the pointer is sampled on a timer while the app is active.
+	func install() {
+		guard poll == nil else { return }
+		poll = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
+			Task { @MainActor in self?.pointerMoved() }
+		}
+		poll?.tolerance = 0.01
+	}
 
-    private func pointerMoved() {
-        guard NSApp.isActive, !shell.contentFullscreen, window.isVisible else { return }
-        guard isShown || sidebarHidden() else { return }
-        let screenPoint = NSEvent.mouseLocation
-        let inWindow = window.frame.contains(screenPoint)
-        let p = window.convertPoint(fromScreen: screenPoint)
-        if !isShown {
-            guard sidebarHidden(), inWindow, p.x <= Metrics.edge else { return }
-            show()
-        } else if !inWindow || p.x > shell.sidebarWidth + Metrics.margin + Metrics.leaveSlack {
-            hide(animated: true)
-        }
-    }
+	private func pointerMoved() {
+		guard NSApp.isActive, !shell.contentFullscreen, window.isVisible else { return }
+		guard isShown || sidebarHidden() else { return }
+		let screenPoint = NSEvent.mouseLocation
+		let inWindow = window.frame.contains(screenPoint)
+		let p = window.convertPoint(fromScreen: screenPoint)
+		if !isShown {
+			guard sidebarHidden(), inWindow, p.x <= Metrics.edge else { return }
+			show()
+		} else if !inWindow || p.x > shell.sidebarWidth + Metrics.margin + Metrics.leaveSlack {
+			hide(animated: true)
+		}
+	}
 
-    /// The sidebar's floating frame on screen, from the shell's layout.
-    private var targetFrame: NSRect {
-        let f = shell.frames(sidebarVisible: false, floating: true, fullscreen: false, width: shell.sidebarWidth).sidebar
-        return window.convertToScreen(shell.convert(f, to: nil))
-    }
+	/// The sidebar's floating frame on screen, from the shell's layout.
+	private var targetFrame: NSRect {
+		let f = shell.frames(
+			sidebarVisible: false, floating: true, fullscreen: false, width: shell.sidebarWidth
+		).sidebar
+		return window.convertToScreen(shell.convert(f, to: nil))
+	}
 
-    /// The panel reaches from the window's left edge to the sidebar's right edge, so the
-    /// sidebar slides in from the window edge and is clipped there (Arc draws it inside
-    /// its window), instead of sliding across whatever lies left of the window.
-    private var panelFrame: NSRect {
-        let t = targetFrame
-        return NSRect(x: window.frame.minX, y: t.minY, width: t.maxX - window.frame.minX, height: t.height)
-    }
+	/// The panel reaches from the window's left edge to the sidebar's right edge, so the
+	/// sidebar slides in from the window edge and is clipped there (Arc draws it inside
+	/// its window), instead of sliding across whatever lies left of the window.
+	private var panelFrame: NSRect {
+		let t = targetFrame
+		return NSRect(
+			x: window.frame.minX, y: t.minY, width: t.maxX - window.frame.minX, height: t.height)
+	}
 
-    /// The sidebar inside the panel: in place, or tucked out past the window edge.
-    private func slideFrame(shown: Bool) -> NSRect {
-        let t = targetFrame
-        return NSRect(x: shown ? t.minX - window.frame.minX : -t.width, y: 0, width: t.width, height: t.height)
-    }
+	/// The sidebar inside the panel: in place, or tucked out past the window edge.
+	private func slideFrame(shown: Bool) -> NSRect {
+		let t = targetFrame
+		return NSRect(
+			x: shown ? t.minX - window.frame.minX : -t.width, y: 0, width: t.width, height: t.height
+		)
+	}
 
-    private func makePanel() -> FloatingSidebarPanel {
-        let p = FloatingSidebarPanel(contentRect: NSRect(x: 0, y: 0, width: 300, height: 600),
-                                     styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        p.isOpaque = false
-        p.backgroundColor = .clear
-        p.hasShadow = true
-        p.isMovable = false
-        p.hidesOnDeactivate = false
-        p.becomesKeyOnlyIfNeeded = true
-        let content = NSView(frame: p.contentRect(forFrameRect: p.frame))
-        content.wantsLayer = true
-        p.contentView = content
-        slider.wantsLayer = true
-        slider.layer?.cornerRadius = Metrics.cornerRadius
-        slider.layer?.cornerCurve = .continuous
-        slider.layer?.masksToBounds = true
-        content.addSubview(slider)
-        blur.blendingMode = .behindWindow
-        blur.state = .active
-        blur.autoresizingMask = [.width, .height]
-        slider.addSubview(blur)
-        lift.wantsLayer = true
-        lift.autoresizingMask = [.width, .height]
-        slider.addSubview(lift)
-        let g = NSHostingView(rootView: SpaceBackground(palette: palette()))
-        g.sizingOptions = []
-        g.autoresizingMask = [.width, .height]
-        slider.addSubview(g)
-        gradientHost = g
-        let lights = FloatingTrafficLights(browserWindow: window)
-        lights.willAct = { [weak self] in self?.hide(animated: false) }
-        trafficLights = lights
-        return p
-    }
+	private func makePanel() -> FloatingSidebarPanel {
+		let p = FloatingSidebarPanel(
+			contentRect: NSRect(x: 0, y: 0, width: 300, height: 600),
+			styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+		p.isOpaque = false
+		p.backgroundColor = .clear
+		p.hasShadow = true
+		p.isMovable = false
+		p.hidesOnDeactivate = false
+		p.becomesKeyOnlyIfNeeded = true
+		let content = NSView(frame: p.contentRect(forFrameRect: p.frame))
+		content.wantsLayer = true
+		p.contentView = content
+		slider.wantsLayer = true
+		slider.layer?.cornerRadius = Metrics.cornerRadius
+		slider.layer?.cornerCurve = .continuous
+		slider.layer?.masksToBounds = true
+		content.addSubview(slider)
+		blur.blendingMode = .behindWindow
+		blur.state = .active
+		blur.autoresizingMask = [.width, .height]
+		slider.addSubview(blur)
+		lift.wantsLayer = true
+		lift.autoresizingMask = [.width, .height]
+		slider.addSubview(lift)
+		let g = NSHostingView(rootView: SpaceBackground(palette: palette()))
+		g.sizingOptions = []
+		g.autoresizingMask = [.width, .height]
+		slider.addSubview(g)
+		gradientHost = g
+		let lights = FloatingTrafficLights(browserWindow: window)
+		lights.willAct = { [weak self] in self?.hide(animated: false) }
+		trafficLights = lights
+		return p
+	}
 
-    private func refreshBackdrop() {
-        guard panel != nil else { return }
-        let pal = palette()
-        let t = CraTuning.shared
-        for v in [blur, lift, gradientHost as NSView?].compactMap({ $0 }) { v.frame = slider.bounds }
-        gradientHost?.rootView = SpaceBackground(palette: pal)
-        blur.isHidden = !pal.vibrant
-        lift.isHidden = !pal.vibrant
-        blur.material = pal.isDark ? .underWindowBackground : t.material
-        blur.appearance = NSAppearance(named: t.darkBlur ? .darkAqua : .aqua)
-        lift.layer?.backgroundColor = NSColor(white: 1, alpha: pal.isDark ? 0.15 : t.liftActive).cgColor
-    }
+	private func refreshBackdrop() {
+		guard panel != nil else { return }
+		let pal = palette()
+		let t = CraTuning.shared
+		for v in [blur, lift, gradientHost as NSView?].compactMap({ $0 }) {
+			v.frame = slider.bounds
+		}
+		gradientHost?.rootView = SpaceBackground(palette: pal)
+		blur.isHidden = !pal.vibrant
+		lift.isHidden = !pal.vibrant
+		blur.material = pal.isDark ? .underWindowBackground : t.material
+		blur.appearance = NSAppearance(named: t.darkBlur ? .darkAqua : .aqua)
+		lift.layer?.backgroundColor =
+			NSColor(white: 1, alpha: pal.isDark ? 0.15 : t.liftActive).cgColor
+	}
 
-    func show() {
-        guard !isShown, sidebarHidden() else { return }
-        isShown = true
-        let p = panel ?? makePanel()
-        panel = p
-        // The window shadow is traced from the panel's pixels once; it comes on when the
-        // sidebar has landed and goes off before it leaves, so no shadow is left behind.
-        p.hasShadow = false
-        p.setFrame(panelFrame, display: false)
-        slider.frame = slideFrame(shown: false)
-        refreshBackdrop()
-        let host = shell.sidebarHost
-        host.removeFromSuperview()
-        host.frame = slider.bounds
-        host.autoresizingMask = [.width, .height]
-        host.layer?.cornerRadius = 0
-        slider.addSubview(host)
-        // The window's own traffic lights hide with the sidebar; these stand in at the
-        // same spot in the sidebar's top row.
-        if let lights = trafficLights {
-            lights.setFrameOrigin(NSPoint(x: 13, y: slider.bounds.height - CraMetrics.titleRowCenter - lights.frame.height / 2))
-            slider.addSubview(lights, positioned: .above, relativeTo: host)
-        }
-        shell.sidebarDetached = true
-        shell.floatingSidebar = true
-        if p.parent !== window { window.addChildWindow(p, ordered: .above) }
-        didAttachPanel?()
-        p.orderFront(nil)
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = Metrics.duration
-            ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.15, 0.7, 0.3, 1)
-            slider.animator().frame = slideFrame(shown: true)
-        } completionHandler: { [weak self] in
-            guard let self, self.isShown else { return }
-            p.hasShadow = true
-            p.invalidateShadow()
-        }
-    }
+	func show() {
+		guard !isShown, sidebarHidden() else { return }
+		isShown = true
+		let p = panel ?? makePanel()
+		panel = p
+		// The window shadow is traced from the panel's pixels once; it comes on when the
+		// sidebar has landed and goes off before it leaves, so no shadow is left behind.
+		p.hasShadow = false
+		p.setFrame(panelFrame, display: false)
+		slider.frame = slideFrame(shown: false)
+		refreshBackdrop()
+		let host = shell.sidebarHost
+		host.removeFromSuperview()
+		host.frame = slider.bounds
+		host.autoresizingMask = [.width, .height]
+		host.layer?.cornerRadius = 0
+		slider.addSubview(host)
+		// The window's own traffic lights hide with the sidebar; these stand in at the
+		// same spot in the sidebar's top row.
+		if let lights = trafficLights {
+			lights.setFrameOrigin(
+				NSPoint(
+					x: 13,
+					y: slider.bounds.height - CraMetrics.titleRowCenter - lights.frame.height / 2))
+			slider.addSubview(lights, positioned: .above, relativeTo: host)
+		}
+		shell.sidebarDetached = true
+		shell.floatingSidebar = true
+		if p.parent !== window { window.addChildWindow(p, ordered: .above) }
+		didAttachPanel?()
+		p.orderFront(nil)
+		NSAnimationContext.runAnimationGroup { ctx in
+			ctx.duration = Metrics.duration
+			ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.15, 0.7, 0.3, 1)
+			slider.animator().frame = slideFrame(shown: true)
+		} completionHandler: { [weak self] in
+			guard let self, self.isShown else { return }
+			p.hasShadow = true
+			p.invalidateShadow()
+		}
+	}
 
-    func hide(animated: Bool) {
-        guard isShown, let p = panel else { return }
-        isShown = false
-        p.hasShadow = false
-        let finish = { [weak self] in
-            guard let self else { return }
-            self.window.removeChildWindow(p)
-            p.orderOut(nil)
-            self.reattach(floating: false)
-        }
-        guard animated else { finish(); return }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = Metrics.duration
-            ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.15, 0.7, 0.3, 1)
-            slider.animator().frame = slideFrame(shown: false)
-        } completionHandler: { finish() }
-    }
+	func hide(animated: Bool) {
+		guard isShown, let p = panel else { return }
+		isShown = false
+		p.hasShadow = false
+		let finish = { [weak self] in
+			guard let self else { return }
+			self.window.removeChildWindow(p)
+			p.orderOut(nil)
+			self.reattach(floating: false)
+		}
+		guard animated else {
+			finish()
+			return
+		}
+		NSAnimationContext.runAnimationGroup { ctx in
+			ctx.duration = Metrics.duration
+			ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.15, 0.7, 0.3, 1)
+			slider.animator().frame = slideFrame(shown: false)
+		} completionHandler: {
+			finish()
+		}
+	}
 
-    /// The sidebar is about to be anchored (⌘S while floating): put it back in the
-    /// shell at its floating frame so the anchoring animation starts from there.
-    func prepareForAnchoring() {
-        guard isShown, let p = panel else { return }
-        isShown = false
-        window.removeChildWindow(p)
-        p.orderOut(nil)
-        reattach(floating: true)
-    }
+	/// The sidebar is about to be anchored (⌘S while floating): put it back in the
+	/// shell at its floating frame so the anchoring animation starts from there.
+	func prepareForAnchoring() {
+		guard isShown, let p = panel else { return }
+		isShown = false
+		window.removeChildWindow(p)
+		p.orderOut(nil)
+		reattach(floating: true)
+	}
 
-    private func reattach(floating: Bool) {
-        let host = shell.sidebarHost
-        host.removeFromSuperview()
-        host.autoresizingMask = []
-        shell.addSubview(host, positioned: .below, relativeTo: shell.resizeHandle)
-        shell.sidebarDetached = false
-        shell.floatingSidebar = floating
-        shell.needsLayout = true
-        shell.layoutSubtreeIfNeeded()
-    }
+	private func reattach(floating: Bool) {
+		let host = shell.sidebarHost
+		host.removeFromSuperview()
+		host.autoresizingMask = []
+		shell.addSubview(host, positioned: .below, relativeTo: shell.resizeHandle)
+		shell.sidebarDetached = false
+		shell.floatingSidebar = floating
+		shell.needsLayout = true
+		shell.layoutSubtreeIfNeeded()
+	}
 
-    /// Window moved or resized while floating.
-    func reposition() {
-        guard isShown, let p = panel else { return }
-        p.setFrame(panelFrame, display: true)
-        slider.frame = slideFrame(shown: true)
-        p.invalidateShadow()
-    }
+	/// Window moved or resized while floating.
+	func reposition() {
+		guard isShown, let p = panel else { return }
+		p.setFrame(panelFrame, display: true)
+		slider.frame = slideFrame(shown: true)
+		p.invalidateShadow()
+	}
 }
 
 final class FloatingSidebarPanel: NSPanel {
-    override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { false }
-    /// Keep the stand-in traffic lights in colour, like the window's (CraWindow).
-    @objc(_hasActiveAppearanceForStandardWindowButton:)
-    func hasActiveAppearance(forStandardWindowButton type: UInt) -> Bool { true }
+	override var canBecomeKey: Bool { true }
+	override var canBecomeMain: Bool { false }
+	/// Keep the stand-in traffic lights in colour, like the window's (CraWindow).
+	@objc(_hasActiveAppearanceForStandardWindowButton:)
+	func hasActiveAppearance(forStandardWindowButton type: UInt) -> Bool { true }
 }
 
 /// Real standard window buttons for the floating sidebar, acting on the browser
 /// window rather than on the panel they sit in. AppKit draws the ×/−/+ glyphs
 /// only while the buttons' superview answers `_mouseInGroup:` with true.
 final class FloatingTrafficLights: NSView {
-    unowned let browserWindow: NSWindow
-    /// Runs before a button acts (the sidebar gets out of the way first).
-    var willAct: () -> Void = {}
-    private var mouseInside = false {
-        didSet { for b in subviews { b.needsDisplay = true } }
-    }
-    private var tracking: NSTrackingArea?
+	unowned let browserWindow: NSWindow
+	/// Runs before a button acts (the sidebar gets out of the way first).
+	var willAct: () -> Void = {}
+	private var mouseInside = false {
+		didSet { for b in subviews { b.needsDisplay = true } }
+	}
+	private var tracking: NSTrackingArea?
 
-    init(browserWindow: NSWindow) {
-        self.browserWindow = browserWindow
-        super.init(frame: .zero)
-        let actions = [#selector(closeWindow), #selector(minimizeWindow), #selector(zoomWindow)]
-        var height: CGFloat = 0
-        for (i, type) in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].enumerated() {
-            guard let b = NSWindow.standardWindowButton(type, for: browserWindow.styleMask) else { continue }
-            b.setFrameOrigin(NSPoint(x: CGFloat(i) * 24, y: 0))
-            b.target = self
-            b.action = actions[i]
-            addSubview(b)
-            height = max(height, b.frame.height)
-            setFrameSize(NSSize(width: b.frame.maxX, height: height))
-        }
-        autoresizingMask = [.maxXMargin, .minYMargin]
-    }
+	init(browserWindow: NSWindow) {
+		self.browserWindow = browserWindow
+		super.init(frame: .zero)
+		let actions = [#selector(closeWindow), #selector(minimizeWindow), #selector(zoomWindow)]
+		var height: CGFloat = 0
+		for (i, type) in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton]
+			.enumerated()
+		{
+			guard let b = NSWindow.standardWindowButton(type, for: browserWindow.styleMask) else {
+				continue
+			}
+			b.setFrameOrigin(NSPoint(x: CGFloat(i) * 24, y: 0))
+			b.target = self
+			b.action = actions[i]
+			addSubview(b)
+			height = max(height, b.frame.height)
+			setFrameSize(NSSize(width: b.frame.maxX, height: height))
+		}
+		autoresizingMask = [.maxXMargin, .minYMargin]
+	}
 
-    required init?(coder: NSCoder) { fatalError() }
+	required init?(coder: NSCoder) { fatalError() }
 
-    @objc(_mouseInGroup:)
-    func mouseInGroup(_ button: NSButton) -> Bool { mouseInside }
+	@objc(_mouseInGroup:)
+	func mouseInGroup(_ button: NSButton) -> Bool { mouseInside }
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let tracking { removeTrackingArea(tracking) }
-        let t = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self, userInfo: nil)
-        addTrackingArea(t)
-        tracking = t
-    }
+	override func updateTrackingAreas() {
+		super.updateTrackingAreas()
+		if let tracking { removeTrackingArea(tracking) }
+		let t = NSTrackingArea(
+			rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+			owner: self, userInfo: nil)
+		addTrackingArea(t)
+		tracking = t
+	}
 
-    override func mouseEntered(with event: NSEvent) { mouseInside = true }
-    override func mouseExited(with event: NSEvent) { mouseInside = false }
-    override func viewDidMoveToWindow() { mouseInside = false }
+	override func mouseEntered(with event: NSEvent) { mouseInside = true }
+	override func mouseExited(with event: NSEvent) { mouseInside = false }
+	override func viewDidMoveToWindow() { mouseInside = false }
 
-    @objc private func closeWindow() { willAct(); browserWindow.performClose(nil) }
-    @objc private func minimizeWindow() { willAct(); browserWindow.performMiniaturize(nil) }
-    /// The green button's click: full screen, or zoom with ⌥ held.
-    @objc private func zoomWindow() {
-        willAct()
-        if NSApp.currentEvent?.modifierFlags.contains(.option) == true { browserWindow.zoom(nil) } else { browserWindow.toggleFullScreen(nil) }
-    }
+	@objc private func closeWindow() {
+		willAct()
+		browserWindow.performClose(nil)
+	}
+	@objc private func minimizeWindow() {
+		willAct()
+		browserWindow.performMiniaturize(nil)
+	}
+	/// The green button's click: full screen, or zoom with ⌥ held.
+	@objc private func zoomWindow() {
+		willAct()
+		if NSApp.currentEvent?.modifierFlags.contains(.option) == true {
+			browserWindow.zoom(nil)
+		} else {
+			browserWindow.toggleFullScreen(nil)
+		}
+	}
 }

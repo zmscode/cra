@@ -2,59 +2,65 @@ import AppKit
 import CraCEF
 
 MainActor.assumeIsolated {
-    // Order matters: the CefAppProtocol NSApplication must exist before Chromium
-    // initializes, and Chromium must be initialized before any browser is made.
-    let app = CraApplication.shared
-    let delegate = AppDelegate()
-    app.delegate = delegate
+	// Order matters: the CefAppProtocol NSApplication must exist before Chromium
+	// initializes, and Chromium must be initialized before any browser is made.
+	let app = CraApplication.shared
+	let delegate = AppDelegate()
+	app.delegate = delegate
 
-    // The newest copy of Cra runs: an older install opens a newer one, and an older
-    // Cra holding the profile quits rather than receiving this launch (NewestCopy).
-    NewestCopy.openNewerInstalledCopy()
-    NewestCopy.replaceOlderRunningCopy()
+	// The newest copy of Cra runs: an older install opens a newer one, and an older
+	// Cra holding the profile quits rather than receiving this launch (NewestCopy).
+	NewestCopy.openNewerInstalledCopy()
+	NewestCopy.replaceOlderRunningCopy()
 
-    // Passwords and cookies staged by the import go into the profile while no
-    // Chromium has it open: before initializing, and only when no other Cra runs.
-    // The run loop has not started, so the list can still hold a Cra that just quit.
-    let me = ProcessInfo.processInfo.processIdentifier
-    let profileIsFree = !NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "").contains(where: { $0.processIdentifier != me && kill($0.processIdentifier, 0) == 0 })
-    // Cookies and passwords move from the mock keychain to Cra's Keychain item first,
-    // staged imports included, so everything below writes with the key Chromium reads.
-    SafeStorage.prepare(profileIsFree: profileIsFree)
-    if profileIsFree {
-        let profile = AppPaths.chromiumCache.appendingPathComponent("Default", isDirectory: true)
-        if CredentialImport.hasPending { CredentialImport.applyPending(profileDir: profile) }
-        CredentialImport.repairImportedCookies(profileDir: profile)
-        ProfileCleanup.run()
-    }
+	// Passwords and cookies staged by the import go into the profile while no
+	// Chromium has it open: before initializing, and only when no other Cra runs.
+	// The run loop has not started, so the list can still hold a Cra that just quit.
+	let me = ProcessInfo.processInfo.processIdentifier
+	let profileIsFree = !NSRunningApplication.runningApplications(
+		withBundleIdentifier: Bundle.main.bundleIdentifier ?? ""
+	).contains(where: { $0.processIdentifier != me && kill($0.processIdentifier, 0) == 0 })
+	// Cookies and passwords move from the mock keychain to Cra's Keychain item first,
+	// staged imports included, so everything below writes with the key Chromium reads.
+	SafeStorage.prepare(profileIsFree: profileIsFree)
+	if profileIsFree {
+		let profile = AppPaths.chromiumCache.appendingPathComponent("Default", isDirectory: true)
+		if CredentialImport.hasPending { CredentialImport.applyPending(profileDir: profile) }
+		CredentialImport.repairImportedCookies(profileDir: profile)
+		ProfileCleanup.run()
+	}
 
-    NativeMessagingHosts.link(into: AppPaths.chromiumCache)
+	NativeMessagingHosts.link(into: AppPaths.chromiumCache)
 
-    let useChromeStyle = ProcessInfo.processInfo.environment["CRA_CHROME_STYLE"] == "1"
-    let started = CraCEFRuntime.initialize(withCachePath: AppPaths.chromiumCache.path,
-                                           userAgentProduct: "",
-                                           logPath: AppPaths.log.path,
-                                           useChromeStyle: useChromeStyle,
-                                           useMockKeychain: !SafeStorage.usesKeychain)
-    if !started && CraCEFRuntime.anotherInstanceWasNotified() {
-        // The running Cra got our command line; just activate it.
-        NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "dk.kildahl.cra")
-            .first { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }?
-            .activate()
-        exit(0)
-    }
-    if !started {
-        let alert = NSAlert()
-        alert.messageText = "Cra could not start Chromium"
-        alert.informativeText = "Chromium Embedded Framework failed to initialize. See \(AppPaths.log.path)."
-        alert.runModal()
-        exit(1)
-    }
+	let useChromeStyle = ProcessInfo.processInfo.environment["CRA_CHROME_STYLE"] == "1"
+	let started = CraCEFRuntime.initialize(
+		withCachePath: AppPaths.chromiumCache.path,
+		userAgentProduct: "",
+		logPath: AppPaths.log.path,
+		useChromeStyle: useChromeStyle,
+		useMockKeychain: !SafeStorage.usesKeychain)
+	if !started && CraCEFRuntime.anotherInstanceWasNotified() {
+		// The running Cra got our command line; just activate it.
+		NSRunningApplication.runningApplications(
+			withBundleIdentifier: Bundle.main.bundleIdentifier ?? "dk.kildahl.cra"
+		)
+		.first { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }?
+		.activate()
+		exit(0)
+	}
+	if !started {
+		let alert = NSAlert()
+		alert.messageText = "Cra could not start Chromium"
+		alert.informativeText =
+			"Chromium Embedded Framework failed to initialize. See \(AppPaths.log.path)."
+		alert.runModal()
+		exit(1)
+	}
 
-    // Belt and braces: Chromium's run loop drives NSApplication and should call
-    // applicationDidFinishLaunching, but bootstrapping is idempotent either way.
-    DispatchQueue.main.async { delegate.bootstrapIfNeeded() }
-    CraCEFRuntime.runMessageLoop()
-    delegate.applicationWillShutdown()
-    CraCEFRuntime.shutdown()
+	// Belt and braces: Chromium's run loop drives NSApplication and should call
+	// applicationDidFinishLaunching, but bootstrapping is idempotent either way.
+	DispatchQueue.main.async { delegate.bootstrapIfNeeded() }
+	CraCEFRuntime.runMessageLoop()
+	delegate.applicationWillShutdown()
+	CraCEFRuntime.shutdown()
 }

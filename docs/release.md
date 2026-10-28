@@ -16,18 +16,18 @@ Everything is scripted; the only manual part is obtaining the certificate once.
    `security find-identity -v -p codesigning`.
 3. **Notarization credentials.** Create an app-specific password at appleid.apple.com.
    Locally you can store it once: `xcrun notarytool store-credentials cra --apple-id
-   you@example.com --team-id ABCDE12345` and then set `NOTARY_KEYCHAIN_PROFILE=cra`.
+you@example.com --team-id ABCDE12345` and then set `NOTARY_KEYCHAIN_PROFILE=cra`.
 4. **GitHub secrets** on `VictorKildahl/cra` (Settings → Secrets and variables → Actions):
 
-   | Secret | Value |
-   |---|---|
-   | `MACOS_CERTIFICATE_P12` | `base64 -i DeveloperID.p12 \| pbcopy` |
-   | `MACOS_CERTIFICATE_PASSWORD` | the `.p12` password |
-   | `MACOS_SIGN_IDENTITY` | the identity string from step 2 |
-   | `APPLE_ID` | the Apple ID email |
-   | `APPLE_TEAM_ID` | the 10-character team id |
-   | `APPLE_APP_PASSWORD` | the app-specific password |
-   | `MACOS_PROVISIONING_PROFILE` | optional, for passkeys (see [Passkeys](#passkeys)) |
+    | Secret                       | Value                                              |
+    | ---------------------------- | -------------------------------------------------- |
+    | `MACOS_CERTIFICATE_P12`      | `base64 -i DeveloperID.p12 \| pbcopy`              |
+    | `MACOS_CERTIFICATE_PASSWORD` | the `.p12` password                                |
+    | `MACOS_SIGN_IDENTITY`        | the identity string from step 2                    |
+    | `APPLE_ID`                   | the Apple ID email                                 |
+    | `APPLE_TEAM_ID`              | the 10-character team id                           |
+    | `APPLE_APP_PASSWORD`         | the app-specific password                          |
+    | `MACOS_PROVISIONING_PROFILE` | optional, for passkeys (see [Passkeys](#passkeys)) |
 
 Until these exist the Release workflow still runs: it publishes an ad-hoc build as a
 regular release (pre-releases are invisible to `releases/latest`) with the install
@@ -137,10 +137,10 @@ Security keys and phones (the QR code in Chrome's "Passkeys & Security Keys" dia
 work in every build. Passkeys kept on the Mac need entitlements macOS only honours
 with a provisioning profile, the way Chrome, Arc and Dia ship:
 
-| Entitlement | Turns on |
-|---|---|
+| Entitlement                                                 | Turns on                                                                                                                                                                                                                 |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `keychain-access-groups` = `<team>.dk.kildahl.cra.webauthn` | Chromium's Touch ID passkeys, stored in Cra's keychain group. `scripts/cef-patches/webauthn-keychain-access-group.patch` derives the group from the app's `application-identifier` (Chromium's branding has no team ID). |
-| `com.apple.developer.web-browser.public-key-credential` | iCloud Keychain passkeys (Passwords app), through Chromium's own iCloud Keychain code. Managed: Apple must approve it. |
+| `com.apple.developer.web-browser.public-key-credential`     | iCloud Keychain passkeys (Passwords app), through Chromium's own iCloud Keychain code. Managed: Apple must approve it.                                                                                                   |
 
 One-time setup, as the Account Holder:
 
