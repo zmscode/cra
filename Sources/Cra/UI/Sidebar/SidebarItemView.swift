@@ -289,6 +289,16 @@ struct TabRow: View {
 	private var contextMenu: some View {
 		if closeGroup.count > 1 {
 			folderMenu(ui.group(for: item.id, in: store))
+			if (2...4).contains(closeGroup.count) {
+				Button("Open \(closeGroup.count) Tabs in Split View") {
+					if let split = store.createSplit(with: closeGroup, at: item.id),
+						let focus = split.split?.focusTabID
+					{
+						store.selectTab(focus, window: ui.windowID)
+					}
+					ui.clearPicks()
+				}
+			}
 			Divider()
 			Button("Close \(closeGroup.count) Tabs") { closeTabs(closeGroup) }
 			Button("Deselect All") { ui.clearPicks() }
@@ -321,6 +331,36 @@ struct TabRow: View {
 		}
 	}
 
+	/// Split view from the tab's menu: pair it with the open tab (or join that tab's split),
+	/// give it an empty pane beside it, or take it back out of its split.
+	@ViewBuilder
+	private var splitMenu: some View {
+		let current = store.selectedTabID(window: ui.windowID)
+		if store.splitContaining(item.id) != nil {
+			Button("Separate from Split View") { actions.separatePane(item.id) }
+		} else {
+			if let current, current != item.id {
+				let panes = store.paneTabIDs(for: current)
+				Button(panes.count > 1 ? "Add to Split View" : "Open in Split View") {
+					if let split = store.splitContaining(current) {
+						store.addToSplit(split.id, tabID: item.id, at: nil)
+					} else if let split = store.createSplit(with: [current, item.id], at: current),
+						let focus = split.split?.focusTabID
+					{
+						// A pinned tab stays put and a copy becomes its pane: show the split's.
+						store.selectTab(focus, window: ui.windowID)
+					}
+				}
+				// Four panes is the most a split holds (MainWindowController.addSplitPane).
+				.disabled(panes.count >= 4)
+			}
+			Button("Split with New Tab") {
+				if current != item.id { store.selectTab(item.id, window: ui.windowID) }
+				actions.performAction("addSplitView")
+			}
+		}
+	}
+
 	@ViewBuilder
 	private var singleTabMenu: some View {
 		if pinned {
@@ -345,6 +385,8 @@ struct TabRow: View {
 			store.setMuted(item.id, !tab.muted)
 			actions.performAction("muteTab:\(item.id)")
 		}
+		Divider()
+		splitMenu
 		if pinned {
 			Divider()
 			if navigatedAway { Button("Back to Pinned Page") { actions.resetPinnedTab(item.id) } }
