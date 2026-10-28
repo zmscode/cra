@@ -92,7 +92,8 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
 
 		let split = NSSplitViewController()
 		let sidebar = NSSplitViewItem(
-			sidebarWithViewController: NSHostingController(rootView: SettingsSidebar(nav: nav)))
+			sidebarWithViewController: NSHostingController(
+				rootView: SettingsSidebar(nav: nav).environment(store)))
 		// macOS 26 insets the sidebar panel 8 pt; Dia's split sits at 204 with its list 8 in.
 		sidebar.minimumThickness = SettingsMetrics.sidebarWidth - 8
 		sidebar.maximumThickness = SettingsMetrics.sidebarWidth - 8
@@ -185,6 +186,7 @@ struct SettingsToolbarRow: View {
 struct SettingsSidebar: View {
 	let nav: SettingsNavigation
 	@Environment(\.controlActiveState) private var activeState
+	@Environment(SidebarStore.self) private var store
 
 	var body: some View {
 		VStack(spacing: 0) {
@@ -193,6 +195,8 @@ struct SettingsSidebar: View {
 		}
 		.padding(.top, 12)
 		.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+		// A wash of the active space's gradient over the sidebar material.
+		.background(store.focusedSpace.theme.palette.gradient.opacity(0.28).ignoresSafeArea())
 	}
 
 	private func row(_ p: SettingsPane) -> some View {

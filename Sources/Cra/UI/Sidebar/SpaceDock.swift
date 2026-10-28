@@ -274,7 +274,7 @@ struct LibraryButton: View {
 
 	/// Where Arc's download bin rests relative to the Library glyph's centre: up and to
 	/// the right, the glyph's box peeking out under its lower-left corner.
-	static let binOffset = CGSize(width: 9, height: -12)
+	static let binOffset = CGSize(width: 9, height: -16)
 
 	var body: some View {
 		libraryGlyph
@@ -309,6 +309,9 @@ struct LibraryButton: View {
 				}
 				.offset(x: 2, y: -1)
 			}
+			// The offsets above don't count toward the stack's size, so it centres on the slot
+			// and draws ~4 pt low; lift it onto the space icons' and "+"'s centre line.
+			.offset(y: -4)
 			.foregroundStyle(ink)
 			.frame(width: 28, height: 28)
 			.background(

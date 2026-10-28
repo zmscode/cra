@@ -233,9 +233,10 @@ final class ShellView: NSView {
 			contentContainer.addSubview(h)
 		}
 		// Start with the no-tab card so the toolbar exists from the first frame.
+		// A space without tabs still shows the card (Arc's tinted empty pane, rounded and
+		// shadowed like a page), so every space looks the same.
 		let card = PaneCardView(tabID: ShellView.noTabID, toolbar: toolbar)
 		card.hasPage = false
-		card.transparent = true
 		contentContainer.addSubview(card)
 		paneCards = [card]
 		paneIDs = []
@@ -300,7 +301,6 @@ final class ShellView: NSView {
 				card.isDark = isDarkTheme
 				card.pageColor = pageColors[id]
 				card.toolbarColor = toolbarColors[id]
-				card.transparent = id == ShellView.noTabID
 				card.showToolbar = showToolbar && !contentFullscreen
 				contentContainer.addSubview(card, positioned: .below, relativeTo: placeholderHost)
 				cards.append(card)
@@ -792,6 +792,7 @@ extension View {
 /// Thin vertical strip between sidebar and content that drags the width. A small pill
 /// fades in on the sidebar side of the card's edge while hovered or dragged.
 final class ResizeHandleView: NSView {
+	var onBegin: (() -> Void)?
 	var onDrag: ((CGFloat) -> Void)?
 	var onEnd: (() -> Void)?
 	/// Where the card starts, in this view: the page window covers everything right of it.
@@ -853,6 +854,7 @@ final class ResizeHandleView: NSView {
 		lastX = event.locationInWindow.x
 		dragging = true
 		updatePill()
+		onBegin?()
 	}
 	override func mouseDragged(with event: NSEvent) {
 		let x = event.locationInWindow.x

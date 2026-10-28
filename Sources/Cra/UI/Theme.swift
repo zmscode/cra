@@ -371,7 +371,7 @@ enum CraMetrics {
 	static let rowCorner: CGFloat = 10
 	static let favicon: CGFloat = 16
 	static let indent: CGFloat = 18
-	static let contentInset: CGFloat = 10
+	static let contentInset: CGFloat = 7
 	static let contentCornerRadius: CGFloat = 10
 	static let toolbarHeight: CGFloat = 32
 	/// Traffic lights, sidebar toggle and nav buttons share this centre line.

@@ -230,9 +230,10 @@ final class CardShadowView: NSView {
 		CATransaction.setDisableActions(true)
 		if frame != target { frame = target }
 		let local = NSRect(x: o, y: o, width: card.width, height: card.height)
-		let shape = CGPath(
-			roundedRect: local, cornerWidth: cornerRadius, cornerHeight: cornerRadius,
-			transform: nil)
+		// The card and the page window round with `.continuous` corners; a circular arc
+		// leaves a sliver of glow inside each corner where the two curves differ.
+		let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+			.path(in: local).cgPath
 		// Everything but the card: the shadows show around it and never under it.
 		let outside = CGMutablePath()
 		outside.addRect(bounds)

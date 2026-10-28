@@ -6,6 +6,7 @@
 #include "include/views/cef_window.h"
 #include "include/views/cef_window_delegate.h"
 #include <crt_externs.h>
+#include <objc/runtime.h>
 #include <atomic>
 #include <map>
 #include <set>
@@ -1887,6 +1888,12 @@ static void MarkProfileExitedCleanly(NSString* profileDir) {
     }
     // Make sure the CefAppProtocol NSApplication exists before CefInitialize.
     [CraApplication sharedApplication];
+    // Pages get overlay scrollbars (shown while scrolling, then faded out) even when
+    // System Settings says "Always": Chromium reads the style here and passes it to renderers.
+    Method scrollerStyle = class_getClassMethod([NSScroller class], @selector(preferredScrollerStyle));
+    method_setImplementation(scrollerStyle, imp_implementationWithBlock(^NSScrollerStyle(id) {
+        return NSScrollerStyleOverlay;
+    }));
 
     CefMainArgs mainArgs(*_NSGetArgc(), *_NSGetArgv());
     CefSettings settings;

@@ -172,6 +172,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, BrowserM
 		}
 
 		wireActions()
+		// Like a divider drag: the page windows redraw at their new size on every move, or
+		// the page lags a frame behind the card and flickers.
+		shell.resizeHandle.onBegin = { [weak self] in self?.pageWindowsFollowLive = true }
 		shell.resizeHandle.onDrag = { [weak self] dx in
 			guard let self else { return }
 			let w = min(
@@ -182,6 +185,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, BrowserM
 		}
 		shell.resizeHandle.onEnd = { [weak self] in
 			guard let self else { return }
+			pageWindowsFollowLive = false
 			store.prefs.sidebarWidth = Double(shell.sidebarWidth)
 			lastSidebarWidth = shell.sidebarWidth
 		}

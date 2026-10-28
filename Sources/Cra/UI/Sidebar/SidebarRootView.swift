@@ -126,8 +126,9 @@ struct SidebarTopBar: View {
 					: CraMetrics.titleAreaHeight - CraMetrics.titleRowCenter - 14
 			)
 			.padding(.horizontal, 6)
-			.contentShape(Rectangle())
-			.onTapGesture(count: 2) { actions.titleBarDoubleClick() }
+			// Empty parts of the row are title bar: a press drags the window, a double-click
+			// runs the title bar action. The buttons sit above it and keep their clicks.
+			.background(WindowDragArea { actions.titleBarDoubleClick() })
 			if compact {
 				urlPill
 					.padding(.horizontal, 8)
@@ -640,5 +641,27 @@ struct NewTabRow: View {
 		}
 		.buttonStyle(.plain)
 		.onHover { hover = $0 }
+	}
+}
+
+/// A stretch of title bar inside SwiftUI: SwiftUI's gestures (and the sidebar's scroll container)
+/// would otherwise take the press, so the press drags the window from AppKit directly.
+struct WindowDragArea: NSViewRepresentable {
+	var onDoubleClick: () -> Void
+
+	func makeNSView(context: Context) -> DragView { DragView() }
+	func updateNSView(_ view: DragView, context: Context) { view.onDoubleClick = onDoubleClick }
+
+	final class DragView: NSView {
+		var onDoubleClick: () -> Void = {}
+		override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+		override var mouseDownCanMoveWindow: Bool { false }
+		override func mouseDown(with event: NSEvent) {
+			if event.clickCount == 2 {
+				onDoubleClick()
+			} else {
+				window?.performDrag(with: event)
+			}
+		}
 	}
 }
