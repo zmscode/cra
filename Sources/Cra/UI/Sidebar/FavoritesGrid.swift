@@ -76,8 +76,11 @@ struct FavoriteCell: View {
 	@Environment(\.sidebarActions) private var actions
 	@State private var hover = false
 	@State private var targeted = false
+	@State private var draft = ""
+	@FocusState private var renameFocused: Bool
 
 	private var selected: Bool { store.selectedTabID(in: space.id, window: ui.windowID) == item.id }
+	private var editing: Bool { ui.renamingID == item.id }
 	private var tileColor: String? { item.tab?.tileColor }
 	private var tileIsDark: Bool {
 		tileColor.flatMap(HexColor.luminance).map { $0 < 0.5 } ?? palette.isDark
@@ -148,6 +151,28 @@ struct FavoriteCell: View {
 			targeted = $0
 		}
 		.iconMenu(palette: palette) { menuItems }
+		// A tile shows no title, so its rename field pops out under it.
+		.popover(
+			isPresented: Binding(
+				get: { editing }, set: { shown in if !shown, editing { commitRename() } }),
+			arrowEdge: .bottom
+		) {
+			TextField("Name", text: $draft)
+				.textFieldStyle(.plain)
+				.font(.system(size: 13))
+				.frame(width: 200)
+				.padding(10)
+				.renameFocus($renameFocused, isEditing: { editing }, commit: commitRename)
+				.onSubmit { commitRename() }
+				.onExitCommand { ui.renamingID = nil }
+				.onAppear { draft = item.title ?? item.displayTitle }
+		}
+	}
+
+	private func commitRename() {
+		guard editing else { return }
+		store.rename(item.id, to: draft.isEmpty ? nil : draft)
+		ui.renamingID = nil
 	}
 
 	/// The tile's icon menu (IconMenu).

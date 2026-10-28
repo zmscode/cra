@@ -381,7 +381,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, BrowserM
 				browsers.runtime(for: $0) == nil && store.item($0)?.isEmptyTab == false
 			})
 		{
-			browsers.show(live, focused: liveFocus, focus: !commandBar.isOpen)
+			// A rename in the sidebar keeps the keyboard; the page gets it back when it ends.
+			browsers.show(
+				live, focused: liveFocus, focus: !commandBar.isOpen && sidebarUI.renamingID == nil)
 		}
 		shell.layoutContentChildren()
 		syncSidebarUI()

@@ -122,14 +122,10 @@ struct TabRow: View {
 				TextField("", text: $draft)
 					.textFieldStyle(.plain)
 					.font(.system(size: 14))
-					.focused($renameFocused)
+					.renameFocus($renameFocused, isEditing: { editing }, commit: commitRename)
 					.onSubmit { commitRename() }
 					.onExitCommand { ui.renamingID = nil }
-					.onAppear {
-						draft = item.title ?? item.displayTitle
-						renameFocused = true
-					}
-					.onChange(of: renameFocused) { _, f in if !f && editing { commitRename() } }
+					.onAppear { draft = item.title ?? item.displayTitle }
 			} else {
 				VStack(alignment: .leading, spacing: 1) {
 					Text(item.displayTitle)
@@ -450,14 +446,10 @@ struct FolderRow: View {
 				TextField("", text: $draft)
 					.textFieldStyle(.plain)
 					.font(.system(size: 14, weight: .medium))
-					.focused($renameFocused)
+					.renameFocus($renameFocused, isEditing: { editing }, commit: commitRename)
 					.onSubmit { commitRename() }
 					.onExitCommand { ui.renamingID = nil }
-					.onAppear {
-						draft = item.title ?? ""
-						renameFocused = true
-					}
-					.onChange(of: renameFocused) { _, f in if !f && editing { commitRename() } }
+					.onAppear { draft = item.title ?? "" }
 			} else {
 				Text(item.title ?? "Folder")
 					.font(.system(size: 14, weight: .medium))

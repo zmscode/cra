@@ -18,6 +18,7 @@ struct SpaceEditorView: View {
 	var onPreview: (SpaceTheme) -> Void = { _ in }
 
 	@State private var title: String
+	@FocusState private var titleFocused: Bool
 	@State private var symbol: String
 	@State private var customSymbol = ""
 	@State private var theme: SpaceTheme
@@ -66,6 +67,10 @@ struct SpaceEditorView: View {
 
 				VStack(alignment: .leading, spacing: 10) {
 					TextField("Name", text: $title).textFieldStyle(.roundedBorder)
+						.focused($titleFocused)
+						// The name takes the cursor when the editor opens (on the next pass, once
+						// the field is in its window).
+						.onAppear { DispatchQueue.main.async { titleFocused = true } }
 					LazyVGrid(
 						columns: Array(repeating: GridItem(.fixed(28), spacing: 4), count: 8),
 						spacing: 4

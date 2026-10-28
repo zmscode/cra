@@ -69,7 +69,6 @@ struct SplitRow: View {
 						store.separateAll(item.id)
 					},
 				],
-				[IconMenuItem(title: "Rename", symbol: "pencil") { ui.renamingID = item.id }],
 				[
 					IconMenuItem(
 						title: section == .today ? "Archive All" : "Close All",
