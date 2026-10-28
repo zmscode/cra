@@ -68,15 +68,21 @@ final class FloatingSidebarController {
 		let screenPoint = NSEvent.mouseLocation
 		let inWindow = window.frame.contains(screenPoint)
 		let p = window.convertPoint(fromScreen: screenPoint)
+		// Distance from the window edge the sidebar lives on.
+		let fromEdge = shell.sidebarOnRight ? window.frame.width - p.x : p.x
 		if !isShown {
-			guard sidebarHidden(), inWindow, p.x <= Metrics.edge else { return }
+			guard sidebarHidden(), inWindow, fromEdge <= Metrics.edge else { return }
 			// In the background, only when no other app's window covers that edge.
 			if !NSApp.isActive {
 				let top = NSWindow.windowNumber(at: screenPoint, belowWindowWithWindowNumber: 0)
 				guard NSApp.window(withWindowNumber: top) != nil else { return }
 			}
 			show()
-		} else if !inWindow || p.x > shell.sidebarWidth + Metrics.margin + Metrics.leaveSlack {
+		} else if fromEdge < -Metrics.leaveSlack || p.y < 0 || p.y > window.frame.height
+			|| fromEdge > shell.sidebarWidth + Metrics.margin + Metrics.leaveSlack
+		{
+			// Overshooting the window's edge a little doesn't count as leaving: moving to an
+			// edge that isn't the screen's almost always does, and the sidebar flicked shut.
 			hide(animated: true)
 		}
 	}
@@ -89,11 +95,15 @@ final class FloatingSidebarController {
 		return window.convertToScreen(shell.convert(f, to: nil))
 	}
 
-	/// The panel reaches from the window's left edge to the sidebar's right edge, so the
-	/// sidebar slides in from the window edge and is clipped there (Arc draws it inside
-	/// its window), instead of sliding across whatever lies left of the window.
+	/// The panel reaches from the window's edge to the sidebar's far edge, so the sidebar
+	/// slides in from the window edge and is clipped there (Arc draws it inside its window),
+	/// instead of sliding across whatever lies beside the window.
 	private var panelFrame: NSRect {
 		let t = targetFrame
+		if shell.sidebarOnRight {
+			return NSRect(
+				x: t.minX, y: t.minY, width: window.frame.maxX - t.minX, height: t.height)
+		}
 		return NSRect(
 			x: window.frame.minX, y: t.minY, width: t.maxX - window.frame.minX, height: t.height)
 	}
@@ -101,6 +111,11 @@ final class FloatingSidebarController {
 	/// The sidebar inside the panel: in place, or tucked out past the window edge.
 	private func slideFrame(shown: Bool) -> NSRect {
 		let t = targetFrame
+		if shell.sidebarOnRight {
+			let panel = panelFrame
+			return NSRect(
+				x: shown ? 0 : panel.width, y: 0, width: t.width, height: t.height)
+		}
 		return NSRect(
 			x: shown ? t.minX - window.frame.minX : -t.width, y: 0, width: t.width, height: t.height
 		)

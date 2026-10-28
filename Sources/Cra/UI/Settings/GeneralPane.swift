@@ -66,6 +66,18 @@ struct GeneralPane: View {
 			SettingsHeader("Appearance")
 			SettingsCard {
 				SettingsCardRow {
+					Text("Sidebar position").font(.system(size: 13))
+				} trailing: {
+					Picker("", selection: $store.settings.sidebarOnRight) {
+						Text("Left").tag(false)
+						Text("Right").tag(true)
+					}
+					.pickerStyle(.segmented)
+					.labelsHidden()
+					.frame(width: 140)
+				}
+				SettingsCardDivider()
+				SettingsCardRow {
 					Text("Window transparency").font(.system(size: 13))
 				} trailing: {
 					Slider(value: $store.settings.windowTransparency, in: 0...1)

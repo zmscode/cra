@@ -101,6 +101,14 @@ final class ShellView: NSView {
 	}
 
 	var sidebarWidth: CGFloat = CraMetrics.sidebarDefaultWidth { didSet { needsLayout = true } }
+	/// General ▸ Appearance ▸ Sidebar position: the whole layout mirrors (frames(...)).
+	var sidebarOnRight = false {
+		didSet {
+			guard sidebarOnRight != oldValue else { return }
+			resizeHandle.mirrored = sidebarOnRight
+			needsLayout = true
+		}
+	}
 	/// Off while the Library has the sidebar: its width is not the user's to drag.
 	var sidebarResizable = true { didSet { needsLayout = true } }
 	var sidebarVisible = true { didSet { needsLayout = true } }
@@ -477,9 +485,12 @@ final class ShellView: NSView {
 		super.mouseMoved(with: event)
 		let p = convert(event.locationInWindow, from: nil)
 		guard !sidebarVisible, !contentFullscreen else { return }
-		if !floatingSidebar, p.x <= 2 {
+		// Measured from the edge the sidebar lives on: with it on the right, a left-edge
+		// reading closed the floating sidebar the moment it opened.
+		let fromEdge = sidebarOnRight ? bounds.width - p.x : p.x
+		if !floatingSidebar, fromEdge <= 2 {
 			onEdgeHover?(true)
-		} else if floatingSidebar, p.x > sidebarWidth + 24 {
+		} else if floatingSidebar, fromEdge > sidebarWidth + 24 {
 			onEdgeHover?(false)
 		}
 	}
@@ -506,6 +517,24 @@ final class ShellView: NSView {
 	}
 
 	func frames(sidebarVisible: Bool, floating: Bool, fullscreen: Bool, width: CGFloat) -> Frames {
+		var f = leftFrames(
+			sidebarVisible: sidebarVisible, floating: floating, fullscreen: fullscreen, width: width)
+		guard sidebarOnRight else { return f }
+		// The sidebar on the right: the same layout mirrored across the window.
+		let w = bounds.width
+		func mirror(_ r: NSRect) -> NSRect {
+			r == .zero ? r : NSRect(x: w - r.maxX, y: r.minY, width: r.width, height: r.height)
+		}
+		f.sidebar = mirror(f.sidebar)
+		f.handle = mirror(f.handle)
+		f.content = mirror(f.content)
+		return f
+	}
+
+	/// The layout with the sidebar on the left.
+	private func leftFrames(sidebarVisible: Bool, floating: Bool, fullscreen: Bool, width: CGFloat)
+		-> Frames
+	{
 		let b = bounds
 		if fullscreen {
 			return Frames(
@@ -566,9 +595,10 @@ final class ShellView: NSView {
 
 	func apply(_ f: Frames) {
 		if !sidebarDetached { sidebarHost.frame = f.sidebar }
+		(window as? CraWindow)?.repositionTrafficLights()
 		resizeHandle.frame = f.handle
 		resizeHandle.isHidden = f.handle.isEmpty || !sidebarResizable
-		resizeHandle.edgeX = f.content.minX - f.handle.minX
+		resizeHandle.edgeX = (sidebarOnRight ? f.content.maxX : f.content.minX) - f.handle.minX
 		contentContainer.frame = f.content
 		cardCornerRadius = f.cornerRadius
 		sidebarHost.layer?.cornerRadius = f.sidebarCorner
@@ -810,6 +840,8 @@ final class ResizeHandleView: NSView {
 	var onEnd: (() -> Void)?
 	/// Where the card starts, in this view: the page window covers everything right of it.
 	var edgeX: CGFloat = 0 { didSet { needsLayout = true } }
+	/// The sidebar is on the right: the pill sits right of the card's edge, not left of it.
+	var mirrored = false { didSet { needsLayout = true } }
 	var isDark = true { didSet { updatePill() } }
 	private var lastX: CGFloat = 0
 	private let pill = CALayer()
@@ -832,7 +864,8 @@ final class ResizeHandleView: NSView {
 		let h = min(48, bounds.height / 3)
 		CATransaction.begin()
 		CATransaction.setDisableActions(true)
-		pill.frame = NSRect(x: edgeX - 5, y: (bounds.height - h) / 2, width: 3, height: h)
+		pill.frame = NSRect(
+			x: mirrored ? edgeX + 2 : edgeX - 5, y: (bounds.height - h) / 2, width: 3, height: h)
 		CATransaction.commit()
 	}
 

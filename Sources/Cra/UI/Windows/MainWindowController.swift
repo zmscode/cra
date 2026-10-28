@@ -106,6 +106,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, BrowserM
 		shell.sidebarVisible = sidebarVisible
 		shell.showToolbar = store.settings.showToolbar
 		lastSidebarVisible = sidebarVisible
+		shell.sidebarOnRight = store.settings.sidebarOnRight
+		// With the sidebar on the right the traffic lights ride in its top-left corner.
+		window.trafficLightsLeading = { [weak self] in
+			guard let shell = self?.shell, shell.sidebarOnRight else { return 0 }
+			let docked = shell.frames(
+				sidebarVisible: true, floating: false, fullscreen: false, width: shell.sidebarWidth)
+			return shell.convert(docked.sidebar, to: nil).minX
+		}
 		window.trafficLightsHidden = !sidebarVisible
 		lastSidebarWidth = CGFloat(store.prefs.sidebarWidth)
 		window.contentView = shell
@@ -177,8 +185,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, BrowserM
 		shell.resizeHandle.onBegin = { [weak self] in self?.pageWindowsFollowLive = true }
 		shell.resizeHandle.onDrag = { [weak self] dx in
 			guard let self else { return }
+			// On the right, dragging the edge left widens the sidebar.
+			let d = shell.sidebarOnRight ? -dx : dx
 			let w = min(
-				max(CraMetrics.sidebarMinWidth, shell.sidebarWidth + dx), CraMetrics.sidebarMaxWidth
+				max(CraMetrics.sidebarMinWidth, shell.sidebarWidth + d), CraMetrics.sidebarMaxWidth
 			)
 			shell.sidebarWidth = w
 			shell.layoutSubtreeIfNeeded()
@@ -339,6 +349,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, BrowserM
 		// would sit, near-opaque, behind a see-through window.
 		shell.vibrantDark = palette.vibrant && palette.isDark
 		(window as? CraWindow)?.trafficLightRingsDark = palette.isDark
+		shell.sidebarOnRight = store.settings.sidebarOnRight
 		shell.vibrantLight = palette.vibrant && !palette.isDark
 		shell.refreshLift()
 		// Settings ▸ Appearance: the desktop shows through everything but the page. Full
@@ -2311,6 +2322,13 @@ final class CraWindow: NSWindow {
 		positionTrafficLights()
 	}
 
+	/// Where the traffic lights start: the sidebar's leading edge (0, or the sidebar's
+	/// left edge when it is on the right).
+	var trafficLightsLeading: () -> CGFloat = { 0 }
+
+	/// After the sidebar moved or was resized.
+	func repositionTrafficLights() { positionTrafficLights() }
+
 	private func positionTrafficLights() {
 		// Full screen moves the buttons into the revealed title bar; the rings stay out of it.
 		guard !styleMask.contains(.fullScreen) else {
@@ -2321,7 +2339,7 @@ final class CraWindow: NSWindow {
 		defer { positionTrafficLightRings(buttons.compactMap { standardWindowButton($0) }) }
 		for (i, type) in buttons.enumerated() {
 			guard let b = standardWindowButton(type), let sv = b.superview else { continue }
-			let x: CGFloat = 13 + CGFloat(i) * 24
+			let x: CGFloat = trafficLightsLeading() + 13 + CGFloat(i) * 24
 			let y = sv.bounds.height - CraMetrics.titleRowCenter - b.frame.height / 2
 			let target = NSPoint(x: x, y: y)
 			if abs(b.frame.origin.x - target.x) > 0.5 || abs(b.frame.origin.y - target.y) > 0.5 {

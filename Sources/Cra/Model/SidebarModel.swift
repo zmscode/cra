@@ -450,7 +450,7 @@ enum TabSleepThreshold: String, Codable, CaseIterable, Identifiable {
 }
 
 enum SearchEngine: String, Codable, CaseIterable, Identifiable {
-	case google, duckduckgo, bing, kagi
+	case duckduckgo, google, bing, kagi
 	var id: String { rawValue }
 	var label: String {
 		switch self {
@@ -475,7 +475,7 @@ enum SearchEngine: String, Codable, CaseIterable, Identifiable {
 
 struct AppSettings: Codable, Equatable {
 	var autoArchive: AutoArchiveThreshold = .twelveHours
-	var searchEngine: SearchEngine = .google
+	var searchEngine: SearchEngine = .duckduckgo
 	var newTabsAtTop: Bool = true
 	/// Tabs ▸ "Show the New Tab button above tabs": the + New Tab row leads Today
 	/// instead of following its last tab.
@@ -522,6 +522,8 @@ struct AppSettings: Codable, Equatable {
 	/// General ▸ Appearance: how much of the desktop shows through the window around the
 	/// page, 0 (opaque) to 1. The space's colour and grain stay visible at 1; pages stay opaque.
 	var windowTransparency: Double = 0
+	/// General ▸ Appearance: the sidebar on the window's right instead of its left.
+	var sidebarOnRight: Bool = false
 
 	init() {}
 
@@ -597,7 +599,8 @@ extension AppSettings {
 		let c = try decoder.container(keyedBy: CodingKeys.self)
 		autoArchive =
 			try c.decodeIfPresent(AutoArchiveThreshold.self, forKey: .autoArchive) ?? .twelveHours
-		searchEngine = try c.decodeIfPresent(SearchEngine.self, forKey: .searchEngine) ?? .google
+		searchEngine =
+			try c.decodeIfPresent(SearchEngine.self, forKey: .searchEngine) ?? .duckduckgo
 		newTabsAtTop = try c.decodeIfPresent(Bool.self, forKey: .newTabsAtTop) ?? true
 		newTabButtonAtTop = try c.decodeIfPresent(Bool.self, forKey: .newTabButtonAtTop) ?? false
 		showStatusBar = try c.decodeIfPresent(Bool.self, forKey: .showStatusBar) ?? true
@@ -634,6 +637,7 @@ extension AppSettings {
 		httpsOnly = try c.decodeIfPresent(Bool.self, forKey: .httpsOnly) ?? false
 		windowTransparency =
 			try c.decodeIfPresent(Double.self, forKey: .windowTransparency) ?? 0
+		sidebarOnRight = try c.decodeIfPresent(Bool.self, forKey: .sidebarOnRight) ?? false
 	}
 }
 
