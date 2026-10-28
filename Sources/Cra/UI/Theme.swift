@@ -440,3 +440,11 @@ enum CraMetrics {
 	/// Gap between the find bar and the page's top and trailing edges.
 	static let findBarInset: CGFloat = 10
 }
+
+extension View {
+	/// A soft shadow under a sidebar button's glyph (not its hover shape), so the icon holds
+	/// up against any space colour.
+	func iconShadow(_ palette: SpacePalette) -> some View {
+		shadow(color: .black.opacity(palette.isDark ? 0.5 : 0.28), radius: 1.5, y: 1)
+	}
+}

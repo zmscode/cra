@@ -702,7 +702,7 @@ final class ShellView: NSView {
 	/// Animate between sidebar states by interpolating frames.
 	func animateSidebar(
 		visible: Bool, floating: Bool, fullscreen: Bool, width: CGFloat,
-		duration: TimeInterval = 0.085
+		duration: TimeInterval = 0.26
 	) {
 		let target = frames(
 			sidebarVisible: visible, floating: floating, fullscreen: fullscreen, width: width)
@@ -723,16 +723,25 @@ final class ShellView: NSView {
 					height: max(0, f.height - toolbarH)), to: nil)
 		}
 		layoutContentChildren()
+		// Coming out from hiding, the sidebar fades in as it slides (from floating it's
+		// already on screen).
+		if visible, !sidebarVisible, !floatingSidebar, !sidebarDetached {
+			sidebarHost.alphaValue = 0
+		}
 		animatingFrames = true
 		onAnimatePaneFrames?(webTargets, duration)
 		NSAnimationContext.runAnimationGroup { ctx in
 			ctx.duration = duration
-			// Fast start, soft landing: feels immediate without a visible snap.
-			// Fitted to Arc 1.170's ⌘S hide at 60 fps: 66 / 87 / 96 / 99 % of the travel after
-			// frames 1–4 (card edge 568 → 204 → 90 → 42 → 24 → 20 px).
-			ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.15, 0.7, 0.3, 1)
+			// A quick start and a long, soft landing, on the same curve the page windows
+			// follow (MainWindowController.animatePageWindows) so card and page move as one.
+			ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.85, 0.25, 1)
 			ctx.allowsImplicitAnimation = true
-			if !sidebarDetached { sidebarHost.animator().frame = target.sidebar }
+			if !sidebarDetached {
+				sidebarHost.animator().frame = target.sidebar
+				// Fade with the slide, so the sidebar eases away instead of being cut off at the
+				// window's edge.
+				sidebarHost.animator().alphaValue = visible || floating ? 1 : 0
+			}
 			contentContainer.animator().frame = target.content
 			cardCornerRadius = target.cornerRadius
 			if paneCards.count == 1, let c = paneCards.first {
@@ -741,6 +750,8 @@ final class ShellView: NSView {
 		} completionHandler: { [weak self] in
 			guard let self else { return }
 			self.animatingFrames = false
+			// Hidden, the sidebar sits off-screen; opaque again for the floating sidebar.
+			self.sidebarHost.alphaValue = 1
 			for c in self.paneCards { c.frozenWebBounds = nil }
 			self.sidebarVisible = visible
 			self.floatingSidebar = floating

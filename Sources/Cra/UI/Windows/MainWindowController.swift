@@ -881,16 +881,35 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, BrowserM
 		let focusRect = (browsers.visibleTabID.flatMap { frames[$0] }) ?? frames.values.first!
 		let focusPage =
 			browsers.visibleTabID.map { pageRect(forBody: focusRect, tab: $0) } ?? focusRect
+		// Resizing a page every frame makes Chromium lay it out again every frame, and the page
+		// shudders. Each page instead keeps one size while it slides with its card: the smaller of
+		// where it starts and where it ends (a shrinking page takes its size up front, a growing
+		// one at the end), so it never overhangs its card and lays out once.
+		var finals: [(NSWindow, page: NSRect, body: NSRect)] = []
+		for id in browsers.visibleTabIDs {
+			guard let w = browsers.runtime(for: id)?.hostWindow, let body = frames[id] else {
+				continue
+			}
+			let page = pageRect(forBody: body, tab: id)
+			let target = window.convertToScreen(page)
+			let size = NSSize(
+				width: min(w.frame.width, target.width), height: min(w.frame.height, target.height))
+			if w.frame.size != size {
+				w.setFrame(
+					NSRect(x: w.frame.minX, y: w.frame.maxY - size.height, width: size.width,
+						height: size.height), display: true)
+			}
+			finals.append((w, page, body))
+		}
 		NSAnimationContext.runAnimationGroup { ctx in
 			ctx.duration = duration
 			ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.85, 0.25, 1)
-			for id in browsers.visibleTabIDs {
-				guard let w = browsers.runtime(for: id)?.hostWindow, let body = frames[id] else {
-					continue
-				}
-				let page = pageRect(forBody: body, tab: id)
-				w.animator().setFrame(window.convertToScreen(page), display: true)
-				updatePageCorners(w, page: page, body: body)
+			for (w, page, _) in finals {
+				// Slide the page's top-left corner with the card's; the size stays put.
+				let target = window.convertToScreen(page)
+				w.animator().setFrame(
+					NSRect(x: target.minX, y: target.maxY - w.frame.height, width: w.frame.width,
+						height: w.frame.height), display: true)
 			}
 			if shell.devToolsFrontendDocked, let dev = browsers.visibleDevToolsWindow,
 				dev.parent === window,
@@ -904,6 +923,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, BrowserM
 			if !overlay.toasts.isEmpty {
 				toastPanel?.animator().setFrame(
 					toastPanelFrame(page: window.convertToScreen(focusPage)), display: true)
+			}
+		} completionHandler: { [weak self] in
+			guard let self, let window = self.window else { return }
+			for (w, page, body) in finals {
+				let target = window.convertToScreen(page)
+				if w.frame != target { w.setFrame(target, display: true) }
+				self.updatePageCorners(w, page: page, body: body)
 			}
 		}
 	}

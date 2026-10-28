@@ -298,6 +298,7 @@ private struct PillImageButton: View {
 				}
 			}
 			.frame(width: 16, height: 16)
+			.iconShadow(palette)
 			.frame(width: 28, height: 28)
 			.background(
 				RoundedRectangle(cornerRadius: 7, style: .continuous).fill(
@@ -345,6 +346,7 @@ struct SidebarIconButton: View {
 			Image(systemName: symbol)
 				.font(.system(size: iconSize, weight: weight))
 				.foregroundStyle(tint)
+				.iconShadow(palette)
 				.frame(width: size, height: height ?? min(size, 28))
 				.background(
 					RoundedRectangle(cornerRadius: 7, style: .continuous).fill(

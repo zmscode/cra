@@ -236,6 +236,7 @@ struct SpaceDockButton: View {
 	var body: some View {
 		SpaceIcon(space, size: 13)
 			.foregroundStyle(palette.textPrimary)
+			.iconShadow(palette)
 			.frame(width: SpaceDock.cell.width, height: SpaceDock.cell.height)
 			.opacity(selected || hovered || pressed ? 1 : 0.45)
 			.saturation(selected || hovered || pressed ? 1 : 0.2)
@@ -315,6 +316,7 @@ struct LibraryButton: View {
 			// and draws ~4 pt low; lift it onto the space icons' and "+"'s centre line.
 			.offset(y: -4)
 			.foregroundStyle(ink)
+			.iconShadow(palette)
 			.frame(width: 28, height: 28)
 			.background(
 				RoundedRectangle(cornerRadius: 7, style: .continuous).fill(
