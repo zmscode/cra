@@ -31,6 +31,7 @@ APP="$STAGE/Cra.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 
 cp "$BIN/Cra" "$APP/Contents/MacOS/Cra"
+scripts/stamp-sdk.sh "$APP/Contents/MacOS/Cra"
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD_NUMBER/" resources/Info.plist > "$APP/Contents/Info.plist"
 # Only release builds (scripts/release.sh) check the update feed; a dev build would
 # otherwise replace itself with the latest release.

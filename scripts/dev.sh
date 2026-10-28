@@ -74,6 +74,7 @@ build() {
     fi
   done
   cp "$bin/Cra" "$APP/Contents/MacOS/$NAME"
+  scripts/stamp-sdk.sh "$APP/Contents/MacOS/$NAME"
   for d in web brand blocklist browsers; do
     [ -d "resources/$d" ] && rsync -a --delete "resources/$d/" "$APP/Contents/Resources/$d/"
   done
