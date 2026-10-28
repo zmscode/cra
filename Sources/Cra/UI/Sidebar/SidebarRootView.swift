@@ -329,16 +329,19 @@ struct SidebarIconButton: View {
 	/// Arc 1.170 draws these glyphs at roughly 26% black (sidebar toggle, library, +) while the
 	/// app is in the background. With the app active its header glyphs darken to ~59% black;
 	/// disabled ones stay at ~24% (light theme, 26 Oct; the dark theme was not measured).
+	/// Cra draws disabled ones a little stronger than Arc (38% while active), so back/forward
+	/// still read as there on pale spaces; never darker than an enabled glyph in the background.
 	private var tint: Color { palette.ink(rawTint) }
 
 	private var rawTint: Color {
 		if palette.isDark {
-			return enabled ? Color.white.opacity(0.55) : palette.textTertiary.opacity(0.55)
+			return enabled ? Color.white.opacity(0.55) : Color.white.opacity(0.32)
 		}
 		guard let active else {
 			return enabled ? Color.black.opacity(0.26) : palette.textTertiary.opacity(0.55)
 		}
-		return Color.black.opacity(enabled && active ? 0.59 : 0.24)
+		if enabled { return Color.black.opacity(active ? 0.59 : 0.24) }
+		return Color.black.opacity(active ? 0.38 : 0.24)
 	}
 
 	var body: some View {

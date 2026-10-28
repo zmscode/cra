@@ -337,6 +337,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, BrowserM
 		// Only vibrant themes get the behind-window blur and lift; on any other theme they
 		// would sit, near-opaque, behind a see-through window.
 		shell.vibrantDark = palette.vibrant && palette.isDark
+		(window as? CraWindow)?.trafficLightRingsDark = palette.isDark
 		shell.vibrantLight = palette.vibrant && !palette.isDark
 		shell.refreshLift()
 		// Settings ▸ Appearance: the desktop shows through everything but the page. Full
@@ -2213,12 +2214,55 @@ final class CraWindow: NSWindow {
 	}
 	private var appliedTrafficLightsHidden = false
 
+	/// A hairline ring under each traffic light. macOS 26+ draws them as pale glass discs
+	/// (grey while inactive), which all but vanish on a light space; the ring gives each an
+	/// edge. Dark on light spaces, light on dark ones (the sidebar's palette).
+	var trafficLightRingsDark = false {
+		didSet { if trafficLightRingsDark != oldValue { styleTrafficLightRings() } }
+	}
+	private var trafficLightRings: [NSView] = []
+
+	private func styleTrafficLightRings() {
+		let color =
+			trafficLightRingsDark
+			? NSColor.white.withAlphaComponent(0.16) : NSColor.black.withAlphaComponent(0.15)
+		for r in trafficLightRings { r.layer?.borderColor = color.cgColor }
+	}
+
+	/// Keeps a ring centred under each button, in the buttons' own superview.
+	private func positionTrafficLightRings(_ buttons: [NSButton]) {
+		if trafficLightRings.count != buttons.count {
+			trafficLightRings.forEach { $0.removeFromSuperview() }
+			trafficLightRings = buttons.map { _ in
+				let v = NSView()
+				v.wantsLayer = true
+				v.layer?.borderWidth = 0.75
+				return v
+			}
+			styleTrafficLightRings()
+		}
+		for (b, ring) in zip(buttons, trafficLightRings) {
+			guard let sv = b.superview else { continue }
+			if ring.superview !== sv { sv.addSubview(ring, positioned: .below, relativeTo: b) }
+			let d = min(b.frame.width, b.frame.height) + 1
+			let frame = NSRect(x: b.frame.midX - d / 2, y: b.frame.midY - d / 2, width: d, height: d)
+			if ring.frame != frame {
+				ring.frame = frame
+				ring.layer?.cornerRadius = d / 2
+			}
+			ring.isHidden = b.isHidden
+			ring.alphaValue = b.alphaValue
+		}
+	}
+
 	private func updateTrafficLights(animated: Bool) {
 		let hide = trafficLightsHidden && !styleMask.contains(.fullScreen)
 		guard hide != appliedTrafficLightsHidden else { return }
 		appliedTrafficLightsHidden = hide
-		let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap
-		{ standardWindowButton($0) }
+		let buttons: [NSView] =
+			[NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap {
+				standardWindowButton($0)
+			} + trafficLightRings
 		// Hidden buttons rest at alpha 1: AppKit refuses to miniaturize a window whose
 		// minimize button has alpha 0 (⌘M and the floating sidebar's yellow button did nothing).
 		guard animated else {
@@ -2236,7 +2280,8 @@ final class CraWindow: NSWindow {
 		}
 		// Same timing as the sidebar's slide (ShellView.animateSidebar).
 		NSAnimationContext.runAnimationGroup { ctx in
-			ctx.duration = 0.085
+			ctx.duration = 0.26
+			ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.85, 0.25, 1)
 			for b in buttons { b.animator().alphaValue = hide ? 0 : 1 }
 		} completionHandler: { [weak self] in
 			guard let self, self.appliedTrafficLightsHidden == hide else { return }
@@ -2259,8 +2304,13 @@ final class CraWindow: NSWindow {
 	}
 
 	private func positionTrafficLights() {
-		guard !styleMask.contains(.fullScreen) else { return }
+		// Full screen moves the buttons into the revealed title bar; the rings stay out of it.
+		guard !styleMask.contains(.fullScreen) else {
+			trafficLightRings.forEach { $0.isHidden = true }
+			return
+		}
 		let buttons: [NSWindow.ButtonType] = [.closeButton, .miniaturizeButton, .zoomButton]
+		defer { positionTrafficLightRings(buttons.compactMap { standardWindowButton($0) }) }
 		for (i, type) in buttons.enumerated() {
 			guard let b = standardWindowButton(type), let sv = b.superview else { continue }
 			let x: CGFloat = 13 + CGFloat(i) * 24
