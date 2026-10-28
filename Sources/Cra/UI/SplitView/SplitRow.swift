@@ -51,24 +51,34 @@ struct SplitRow: View {
 		}
 		.contentShape(Rectangle())
 		.onHover { hover = $0 }
-		.contextMenu {
-			Button("Separate All Tabs") { store.separateAll(item.id) }
-			Button(
-				item.split?.orientation == .vertical
-					? "Convert to Horizontal Split View" : "Convert to Vertical Split View"
-			) { store.flipSplitOrientation(item.id) }
-			Button("Add Pane") {
-				if let first = children.first {
-					actions.focusPane(first.id)
-					actions.performAction("addSplitView")
-				}
-			}
-			Divider()
-			Button("Rename…") { ui.renamingID = item.id }
-			Divider()
-			Button(section == .today ? "Archive All" : "Close All") {
-				for c in children { actions.closeTab(c.id) }
-			}
+		.iconMenu(palette: palette) {
+			let vertical = item.split?.orientation == .vertical
+			return [
+				[
+					IconMenuItem(title: "Add Pane", symbol: "plus.rectangle") {
+						if let first = children.first {
+							actions.focusPane(first.id)
+							actions.performAction("addSplitView")
+						}
+					},
+					IconMenuItem(
+						title: vertical ? "Convert to Horizontal Split" : "Convert to Vertical Split",
+						symbol: vertical ? "rectangle.split.2x1" : "rectangle.split.1x2"
+					) { store.flipSplitOrientation(item.id) },
+					IconMenuItem(title: "Separate All Tabs", symbol: "rectangle.split.2x1.slash") {
+						store.separateAll(item.id)
+					},
+				],
+				[IconMenuItem(title: "Rename", symbol: "pencil") { ui.renamingID = item.id }],
+				[
+					IconMenuItem(
+						title: section == .today ? "Archive All" : "Close All",
+						symbol: section == .today ? "archivebox" : "xmark", destructive: true
+					) {
+						for c in children { actions.closeTab(c.id) }
+					}
+				],
+			]
 		}
 		.modifier(SidebarDropPreview(id: item.id, palette: palette))
 	}
@@ -129,14 +139,23 @@ struct SplitChildCell: View {
 			.padding(8)
 			.background(RoundedRectangle(cornerRadius: 8).fill(.regularMaterial))
 		}
-		.contextMenu {
-			Button("Separate Tab from Split") { store.separateFromSplit(item.id) }
-			Button("Copy Link") {
-				NSPasteboard.general.clearContents()
-				NSPasteboard.general.setString(item.tab?.url ?? "", forType: .string)
-			}
-			Divider()
-			Button("Close") { actions.closeTab(item.id) }
+		.iconMenu(palette: palette) {
+			[
+				[
+					IconMenuItem(title: "Separate from Split", symbol: "rectangle.split.2x1.slash") {
+						store.separateFromSplit(item.id)
+					},
+					IconMenuItem(title: "Copy Link", symbol: "link") {
+						NSPasteboard.general.clearContents()
+						NSPasteboard.general.setString(item.tab?.url ?? "", forType: .string)
+					},
+				],
+				[
+					IconMenuItem(title: "Close", symbol: "xmark", destructive: true) {
+						actions.closeTab(item.id)
+					}
+				],
+			]
 		}
 		.arcTooltip(item.displayTitle, followsCursor: true)
 	}

@@ -258,18 +258,9 @@ struct TabRow: View {
 			.padding(8)
 			.background(RoundedRectangle(cornerRadius: 8).fill(.regularMaterial))
 		}
-		.contextMenu { contextMenu }
-		// One tab: the icon menu (TabActionMenu) instead of the system menu above, which
-		// still serves several picked tabs.
-		.overlay(
-			RightClickCatcher(enabled: { closeGroup.count == 1 && !editing }) {
-				TabActionMenu.show(
-					AnyView(
-						TabActionMenuView(item: item, pinned: pinned, navigatedAway: navigatedAway)
-							.environment(store).environment(ui)
-							.environment(\.sidebarActions, actions)),
-					dark: palette.isDark)
-			})
+		.iconMenu(palette: palette, enabled: { !editing }) {
+			closeGroup.count > 1 ? groupMenuItems : menuItems
+		}
 		// Arc's row tip is the tab's title by the pointer; the close buttons' own tips win over it.
 		// Like Arc (didShowRenameHint), "Double-click to rename" rides along once.
 		.arcTooltip(
@@ -296,130 +287,116 @@ struct TabRow: View {
 		}
 	}
 
-	@ViewBuilder
-	private var contextMenu: some View {
-		if closeGroup.count > 1 {
-			folderMenu(ui.group(for: item.id, in: store))
-			if (2...4).contains(closeGroup.count) {
-				Button("Open \(closeGroup.count) Tabs in Split View") {
-					if let split = store.createSplit(with: closeGroup, at: item.id),
+	/// The icon menu for this tab (IconMenu).
+	private var menuItems: [[IconMenuItem]] {
+		let fav = store.isFavorite(item.id)
+		var edit = [
+			IconMenuItem(title: "Rename", symbol: "pencil") { ui.renamingID = item.id },
+			IconMenuItem(title: "Duplicate", symbol: "plus.square.on.square") {
+				store.duplicateTab(item.id)
+			},
+			IconMenuItem(title: "Copy Link", symbol: "link") {
+				NSPasteboard.general.clearContents()
+				NSPasteboard.general.setString(tab.url, forType: .string)
+			},
+			IconMenuItem(
+				title: tab.muted ? "Unmute" : "Mute",
+				symbol: tab.muted ? "speaker.wave.2" : "speaker.slash"
+			) {
+				store.setMuted(item.id, !tab.muted)
+				actions.performAction("muteTab:\(item.id)")
+			},
+		]
+		if navigatedAway {
+			edit.append(
+				IconMenuItem(title: "Back to Pinned Page", symbol: "arrow.uturn.backward") {
+					actions.resetPinnedTab(item.id)
+				})
+		}
+		// A pinned tab closes (stays pinned, unloaded) or archives (leaves the list).
+		var end: [IconMenuItem] = []
+		if pinned, selected || loaded {
+			end.append(
+				IconMenuItem(title: "Close and Keep Pinned", symbol: "xmark") {
+					actions.closeTab(item.id)
+				})
+		}
+		end.append(
+			IconMenuItem(title: "Archive", symbol: "archivebox", destructive: true) {
+				pinned ? store.archiveTab(item.id, reason: .manual) : actions.closeTab(item.id)
+			})
+		return [
+			[
+				IconMenuItem(title: pinned ? "Unpin" : "Pin", symbol: pinned ? "pin.slash" : "pin") {
+					pinned ? store.unpinTab(item.id) : store.pinTab(item.id)
+				},
+				IconMenuItem(
+					title: fav ? "Unfavourite" : "Favourite", symbol: fav ? "star.slash" : "star"
+				) {
+					fav ? store.removeFromFavorites(item.id) : store.addToFavorites(item.id)
+				},
+				splitItem,
+			],
+			edit, end,
+		]
+	}
+
+	/// Pair with the open tab (or join its split), give it an empty pane, or take it out.
+	private var splitItem: IconMenuItem {
+		let current = store.selectedTabID(window: ui.windowID)
+		if store.splitContaining(item.id) != nil {
+			return IconMenuItem(title: "Unsplit", symbol: "rectangle.split.2x1.slash") {
+				actions.separatePane(item.id)
+			}
+		}
+		if let current, current != item.id, store.paneTabIDs(for: current).count < 4 {
+			return IconMenuItem(title: "Split", symbol: "rectangle.split.2x1") {
+				if let split = store.splitContaining(current) {
+					store.addToSplit(split.id, tabID: item.id, at: nil)
+				} else if let split = store.createSplit(with: [current, item.id], at: current),
+					let focus = split.split?.focusTabID
+				{
+					// A pinned tab stays put and a copy becomes its pane: show the split's.
+					store.selectTab(focus, window: ui.windowID)
+				}
+			}
+		}
+		return IconMenuItem(title: "Split with New Tab", symbol: "rectangle.split.2x1") {
+			if current != item.id { store.selectTab(item.id, window: ui.windowID) }
+			actions.performAction("addSplitView")
+		}
+	}
+
+	/// The icon menu for several picked tabs.
+	private var groupMenuItems: [[IconMenuItem]] {
+		let ids = closeGroup
+		var first = [
+			IconMenuItem(title: "New Folder with \(ids.count) Tabs", symbol: "folder.badge.plus") {
+				withAnimation(.snappy(duration: 0.22, extraBounce: 0)) {
+					ui.renamingID = store.createFolder(with: ids).id
+				}
+			}
+		]
+		if (2...4).contains(ids.count) {
+			first.append(
+				IconMenuItem(title: "Open \(ids.count) Tabs in Split View", symbol: "rectangle.split.2x1") {
+					if let split = store.createSplit(with: ids, at: item.id),
 						let focus = split.split?.focusTabID
 					{
 						store.selectTab(focus, window: ui.windowID)
 					}
 					ui.clearPicks()
+				})
+		}
+		return [
+			first,
+			[IconMenuItem(title: "Deselect All", symbol: "xmark.circle") { ui.clearPicks() }],
+			[
+				IconMenuItem(title: "Close \(ids.count) Tabs", symbol: "xmark", destructive: true) {
+					closeTabs(ids)
 				}
-			}
-			Divider()
-			Button("Close \(closeGroup.count) Tabs") { closeTabs(closeGroup) }
-			Button("Deselect All") { ui.clearPicks() }
-		} else {
-			singleTabMenu
-		}
-	}
-
-	/// Move to Folder / New Folder for this tab, or for every picked tab.
-	@ViewBuilder
-	private func folderMenu(_ ids: [UUID]) -> some View {
-		let folders = store.children(of: store.focusedSpace(window: ui.windowID).pinnedContainerID)
-			.filter { $0.isFolder && !$0.isLiveFolder }
-		if !folders.isEmpty {
-			Menu(ids.count > 1 ? "Move \(ids.count) Tabs to Folder" : "Move to Folder") {
-				ForEach(folders) { f in
-					Button(f.title ?? "Folder") {
-						withAnimation(.snappy(duration: 0.22, extraBounce: 0)) {
-							store.moveItems(ids, to: f.id, index: nil)
-						}
-					}
-					.disabled(ids.allSatisfy { store.item($0)?.parentID == f.id })
-				}
-			}
-		}
-		Button(ids.count > 1 ? "New Folder with \(ids.count) Tabs" : "New Folder with Tab") {
-			withAnimation(.snappy(duration: 0.22, extraBounce: 0)) {
-				ui.renamingID = store.createFolder(with: ids).id
-			}
-		}
-	}
-
-	/// Split view from the tab's menu: pair it with the open tab (or join that tab's split),
-	/// give it an empty pane beside it, or take it back out of its split.
-	@ViewBuilder
-	private var splitMenu: some View {
-		let current = store.selectedTabID(window: ui.windowID)
-		if store.splitContaining(item.id) != nil {
-			Button("Separate from Split View") { actions.separatePane(item.id) }
-		} else {
-			if let current, current != item.id {
-				let panes = store.paneTabIDs(for: current)
-				Button(panes.count > 1 ? "Add to Split View" : "Open in Split View") {
-					if let split = store.splitContaining(current) {
-						store.addToSplit(split.id, tabID: item.id, at: nil)
-					} else if let split = store.createSplit(with: [current, item.id], at: current),
-						let focus = split.split?.focusTabID
-					{
-						// A pinned tab stays put and a copy becomes its pane: show the split's.
-						store.selectTab(focus, window: ui.windowID)
-					}
-				}
-				// Four panes is the most a split holds (MainWindowController.addSplitPane).
-				.disabled(panes.count >= 4)
-			}
-			Button("Split with New Tab") {
-				if current != item.id { store.selectTab(item.id, window: ui.windowID) }
-				actions.performAction("addSplitView")
-			}
-		}
-	}
-
-	@ViewBuilder
-	private var singleTabMenu: some View {
-		if pinned {
-			Button("Unpin Tab") { store.unpinTab(item.id) }
-		} else {
-			Button("Pin Tab") { store.pinTab(item.id) }
-		}
-		if store.isFavorite(item.id) {
-			Button("Remove from Favorites") { store.removeFromFavorites(item.id) }
-		} else {
-			Button("Add to Favorites") { store.addToFavorites(item.id) }
-		}
-		Divider()
-		Button("Rename…") { ui.renamingID = item.id }
-		if item.title != nil { Button("Use Page Title") { store.rename(item.id, to: nil) } }
-		Button("Duplicate") { store.duplicateTab(item.id) }
-		Button("Copy Link") {
-			NSPasteboard.general.clearContents()
-			NSPasteboard.general.setString(tab.url, forType: .string)
-		}
-		Button(tab.muted ? "Unmute" : "Mute") {
-			store.setMuted(item.id, !tab.muted)
-			actions.performAction("muteTab:\(item.id)")
-		}
-		Divider()
-		splitMenu
-		if pinned {
-			Divider()
-			if navigatedAway { Button("Back to Pinned Page") { actions.resetPinnedTab(item.id) } }
-			Button("Make This the Pinned Page") { store.setPinnedHomeToCurrent(item.id) }
-		}
-		Divider()
-		Menu("Move to Space") {
-			ForEach(store.orderedSpaces) { s in
-				Button { store.moveTab(item.id, toSpace: s.id) } label: {
-					Label(s.title, systemImage: s.symbolName)
-				}
-					.disabled(s.id == store.spaceID(ofItem: item.id))
-			}
-		}
-		folderMenu([item.id])
-		Divider()
-		if pinned {
-			if selected || loaded { Button("Close and Keep Pinned") { actions.closeTab(item.id) } }
-			Button("Archive Tab") { store.archiveTab(item.id, reason: .manual) }
-		} else {
-			Button("Archive") { actions.closeTab(item.id) }
-		}
+			],
+		]
 	}
 }
 
@@ -503,35 +480,41 @@ struct FolderRow: View {
 			}
 		}
 		.draggable(SidebarDragItem.begin(item.id, session))
-		.contextMenu {
-			if item.isLiveFolder {
-				LiveFolderMenu(item: item)
-			} else {
-				folderMenu
-			}
+		// A live folder's menu holds its settings, so it stays the system menu.
+		.contextMenu { if item.isLiveFolder { LiveFolderMenu(item: item) } }
+		.iconMenu(palette: palette, enabled: { !item.isLiveFolder && !editing }) {
+			folderMenuItems
 		}
 		.modifier(SidebarDropPreview(id: item.id, palette: palette))
 	}
 
-	@ViewBuilder
-	private var folderMenu: some View {
-		Button("Rename…") { ui.renamingID = item.id }
-		Button("New Folder Inside") {
-			let f = store.createFolder(named: "New Folder", in: item.id, index: 0)
-			store.setExpanded(item.id, true)
-			ui.renamingID = f.id
-		}
-		Picker(
-			"Icon Color",
-			selection: Binding(
-				get: { item.folderIcon }, set: { store.setFolderIcon($0, for: item.id) })
-		) {
-			Text("Auto").tag(FolderIconStyle?.none)
-			Text("White").tag(FolderIconStyle?.some(.white))
-			Text("Black").tag(FolderIconStyle?.some(.black))
-		}
-		Divider()
-		Button("Delete Folder (archives tabs)") { store.deleteFolder(item.id) }
+	/// The folder's icon menu (IconMenu). Its icon colour cycles Auto → White → Black.
+	private var folderMenuItems: [[IconMenuItem]] {
+		let next: FolderIconStyle? =
+			switch item.folderIcon {
+			case nil: .white
+			case .white: .black
+			case .black: nil
+			}
+		let nextName = next.map { $0 == .white ? "White" : "Black" } ?? "Auto"
+		return [
+			[
+				IconMenuItem(title: "Rename", symbol: "pencil") { ui.renamingID = item.id },
+				IconMenuItem(title: "New Folder Inside", symbol: "folder.badge.plus") {
+					let f = store.createFolder(named: "New Folder", in: item.id, index: 0)
+					store.setExpanded(item.id, true)
+					ui.renamingID = f.id
+				},
+				IconMenuItem(title: "Icon Colour: \(nextName)", symbol: "circle.lefthalf.filled") {
+					store.setFolderIcon(next, for: item.id)
+				},
+			],
+			[
+				IconMenuItem(title: "Delete Folder (archives tabs)", symbol: "trash", destructive: true) {
+					store.deleteFolder(item.id)
+				}
+			],
+		]
 	}
 
 	private func commitRename() {

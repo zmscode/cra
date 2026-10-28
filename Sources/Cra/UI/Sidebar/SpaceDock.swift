@@ -100,29 +100,38 @@ struct SpaceDock: View {
 		}
 	}
 
-	private func menu(for space: Space) -> NSMenu {
-		let menu = NSMenu()
-		menu.addItem(BlockMenuItem(title: "Edit Space…") { actions.editSpace(space) })
-		menu.addItem(.separator())
-		menu.addItem(
-			BlockMenuItem(title: "Move Left") {
-				if let i = store.spaceOrder.firstIndex(of: space.id) {
-					store.moveSpace(space.id, to: max(0, i - 1))
-				}
-			})
-		menu.addItem(
-			BlockMenuItem(title: "Move Right") {
-				if let i = store.spaceOrder.firstIndex(of: space.id) {
+	/// The space's icon menu (IconMenu); no system menu.
+	private func menu(for space: Space) -> NSMenu? {
+		let i = store.spaceOrder.firstIndex(of: space.id)
+		var move: [IconMenuItem] = []
+		if let i, i > 0 {
+			move.append(
+				IconMenuItem(title: "Move Left", symbol: "chevron.left") {
+					store.moveSpace(space.id, to: i - 1)
+				})
+		}
+		if let i, i < store.spaceOrder.count - 1 {
+			move.append(
+				IconMenuItem(title: "Move Right", symbol: "chevron.right") {
 					store.moveSpace(space.id, to: i + 1)
-				}
-			})
-		menu.addItem(.separator())
-		menu.addItem(
-			BlockMenuItem(title: "Delete Space…") {
-				store.focusSpace(space.id, window: ui.windowID)
-				actions.performAction("deleteSpace")
-			})
-		return menu
+				})
+		}
+		IconMenu.show(
+			[
+				[
+					IconMenuItem(title: "Edit Space", symbol: "slider.horizontal.3") {
+						actions.editSpace(space)
+					}
+				],
+				move,
+				[
+					IconMenuItem(title: "Delete Space", symbol: "trash", destructive: true) {
+						store.focusSpace(space.id, window: ui.windowID)
+						actions.performAction("deleteSpace")
+					}
+				],
+			], palette: palette)
+		return nil
 	}
 }
 
@@ -146,7 +155,7 @@ private struct SpaceDockMouse: NSViewRepresentable {
 	let press: (Int) -> Void
 	let drag: (CGSize) -> Void
 	let release: (_ inside: Bool) -> Void
-	let menu: (Int) -> NSMenu
+	let menu: (Int) -> NSMenu?
 
 	func makeNSView(context: Context) -> MouseView { MouseView() }
 	func updateNSView(_ view: MouseView, context: Context) { view.config = self }

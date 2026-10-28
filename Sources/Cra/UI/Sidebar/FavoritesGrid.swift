@@ -147,64 +147,65 @@ struct FavoriteCell: View {
 		} isTargeted: {
 			targeted = $0
 		}
-		.contextMenu {
-			Button("Remove from Favorites") { store.removeFromFavorites(item.id) }
-			Button("Rename…") { ui.renamingID = item.id }
-			Button("Copy Link") {
-				NSPasteboard.general.clearContents()
-				NSPasteboard.general.setString(item.tab?.url ?? "", forType: .string)
-			}
-			if let t = item.tab, t.url != t.savedURL {
-				Button("Back to Pinned Page") { actions.resetPinnedTab(item.id) }
-			}
-			Button("Make This the Pinned Page") { store.setPinnedHomeToCurrent(item.id) }
-			Divider()
-			Button("Change Icon…") { pickIcon() }
-			if let key = item.tab?.customIconKey {
-				Button("Use Site Icon") {
-					store.setCustomIcon(nil, for: item.id)
-					favicons.removeCustomIcon(key)
-				}
-			}
-			tileColorMenu
-			Divider()
-			Button("Close") { actions.closeTab(item.id) }
-			Button("Archive") { store.archiveTab(item.id, reason: .manual) }
-		}
+		.iconMenu(palette: palette) { menuItems }
 	}
 
-	private var tileColorMenu: some View {
-		Menu("Tile Color") {
-			colorToggle("Default", hex: nil)
-			ForEach(TileColor.presets, id: \.hex) { colorToggle($0.name, hex: $0.hex) }
-			if let tileColor, !TileColor.presets.contains(where: { $0.hex == tileColor }) {
-				colorToggle("Custom", hex: tileColor)
-			}
-			Button("Other Color…") {
+	/// The tile's icon menu (IconMenu).
+	private var menuItems: [[IconMenuItem]] {
+		var page = [
+			IconMenuItem(title: "Rename", symbol: "pencil") { ui.renamingID = item.id },
+			IconMenuItem(title: "Copy Link", symbol: "link") {
+				NSPasteboard.general.clearContents()
+				NSPasteboard.general.setString(item.tab?.url ?? "", forType: .string)
+			},
+		]
+		if let t = item.tab, t.url != t.savedURL {
+			page.append(
+				IconMenuItem(title: "Back to Pinned Page", symbol: "arrow.uturn.backward") {
+					actions.resetPinnedTab(item.id)
+				})
+		}
+		var look = [
+			IconMenuItem(title: "Change Icon", symbol: "photo") { pickIcon() },
+			IconMenuItem(title: "Tile Colour", symbol: "paintpalette") {
 				let id = item.id
 				TileColorPanel.shared.show(tileColor) { [store] hex in
 					store.setTileColor(hex, for: [id])
 				}
-			}
-			Divider()
-			Button("Use This Color for All Favorites") {
-				store.setTileColor(
-					tileColor, for: store.tabs(under: space.favoritesContainerID).map(\.id))
-			}
+			},
+		]
+		if tileColor != nil {
+			look.append(
+				IconMenuItem(title: "Default Tile Colour", symbol: "paintpalette.fill") {
+					store.setTileColor(nil, for: [item.id])
+				})
+			look.append(
+				IconMenuItem(title: "Use This Colour for All Favourites", symbol: "square.grid.2x2") {
+					store.setTileColor(
+						tileColor, for: store.tabs(under: space.favoritesContainerID).map(\.id))
+				})
 		}
-	}
-
-	private func colorToggle(_ name: String, hex: String?) -> some View {
-		Toggle(
-			isOn: Binding(
-				get: { tileColor == hex }, set: { _ in store.setTileColor(hex, for: [item.id]) })
-		) {
-			Label {
-				Text(name)
-			} icon: {
-				Image(nsImage: TileColor.swatch(hex))
-			}
+		if let key = item.tab?.customIconKey {
+			look.insert(
+				IconMenuItem(title: "Use Site Icon", symbol: "globe") {
+					store.setCustomIcon(nil, for: item.id)
+					favicons.removeCustomIcon(key)
+				}, at: 1)
 		}
+		return [
+			[
+				IconMenuItem(title: "Unfavourite", symbol: "star.slash") {
+					store.removeFromFavorites(item.id)
+				}
+			],
+			page, look,
+			[
+				IconMenuItem(title: "Close", symbol: "xmark") { actions.closeTab(item.id) },
+				IconMenuItem(title: "Archive", symbol: "archivebox", destructive: true) {
+					store.archiveTab(item.id, reason: .manual)
+				},
+			],
+		]
 	}
 
 	private func pickIcon() {

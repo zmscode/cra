@@ -349,14 +349,21 @@ private struct LibraryArchiveRow: View {
 		.padding(.vertical, 2)
 		.onHover { hover = $0 }
 		.arcTooltip(entry.item.tab?.url ?? "")
-		.contextMenu {
-			Button("Restore", action: restore)
-			Button("Copy Link") {
-				NSPasteboard.general.clearContents()
-				NSPasteboard.general.setString(entry.item.tab?.url ?? "", forType: .string)
-			}
-			Divider()
-			Button("Remove from Archive") { store.removeFromArchive(entry.id) }
+		.iconMenu(palette: palette) {
+			[
+				[
+					IconMenuItem(title: "Restore", symbol: "arrow.uturn.backward", action: restore),
+					IconMenuItem(title: "Copy Link", symbol: "link") {
+						NSPasteboard.general.clearContents()
+						NSPasteboard.general.setString(entry.item.tab?.url ?? "", forType: .string)
+					},
+				],
+				[
+					IconMenuItem(title: "Remove from Archive", symbol: "trash", destructive: true) {
+						store.removeFromArchive(entry.id)
+					}
+				],
+			]
 		}
 	}
 }
@@ -409,14 +416,23 @@ private struct LibraryDownloadRow: View {
 		.padding(.vertical, 2)
 		.onHover { hover = $0 }
 		.onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
-		.contextMenu {
-			Button("Open") { NSWorkspace.shared.open(url) }
-			Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
-			Divider()
-			Button("Copy") {
-				NSPasteboard.general.clearContents()
-				NSPasteboard.general.writeObjects([url as NSURL])
-			}
+		.iconMenu(palette: palette) {
+			[
+				[
+					IconMenuItem(title: "Open", symbol: "arrow.up.forward.app") {
+						NSWorkspace.shared.open(url)
+					},
+					IconMenuItem(title: "Show in Finder", symbol: "folder") {
+						NSWorkspace.shared.activateFileViewerSelecting([url])
+					},
+				],
+				[
+					IconMenuItem(title: "Copy", symbol: "doc.on.doc") {
+						NSPasteboard.general.clearContents()
+						NSPasteboard.general.writeObjects([url as NSURL])
+					}
+				],
+			]
 		}
 	}
 

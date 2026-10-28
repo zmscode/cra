@@ -398,8 +398,8 @@ struct SpaceSectionView: View {
 						.overlay(alignment: .topLeading) { dropLine }
 						.background(DragAutoscroller.Anchor(scroller: autoscroller))
 						.contentShape(Rectangle())
-						// Right-click on empty list space; rows have their own menus.
-						.contextMenu { listMenu }
+						// Right-click on empty list space; rows have their own (smaller) menus.
+						.iconMenu(palette: palette) { listMenuItems }
 						.onDrop(
 							of: [.craSidebarItem],
 							delegate: SidebarListDropDelegate(
@@ -434,17 +434,31 @@ struct SpaceSectionView: View {
 
 	private static let scrollSpace = "spaceSectionScroll"
 
-	@ViewBuilder
-	private var listMenu: some View {
-		Button("New Tab") { actions.openCommandBar(.newTab) }
-		Button("New Folder") { actions.performAction("newFolder") }
-		Button("New GitHub Live Folder") { actions.performAction("newGitHubLiveFolder") }
-			.disabled(store.liveFolder(.github, inSpace: space.id) != nil)
-		Divider()
-		if !store.children(of: space.todayContainerID).isEmpty {
-			Button("Clear Today") { store.clearToday(space.id) }
+	private var listMenuItems: [[IconMenuItem]] {
+		var make = [
+			IconMenuItem(title: "New Tab", symbol: "plus") { actions.openCommandBar(.newTab) },
+			IconMenuItem(title: "New Folder", symbol: "folder.badge.plus") {
+				actions.performAction("newFolder")
+			},
+		]
+		if store.liveFolder(.github, inSpace: space.id) == nil {
+			make.append(
+				IconMenuItem(title: "New GitHub Live Folder", symbol: "arrow.triangle.pull") {
+					actions.performAction("newGitHubLiveFolder")
+				})
 		}
-		Button("Edit Space…") { actions.editSpace(space) }
+		var edit = [
+			IconMenuItem(title: "Edit Space", symbol: "slider.horizontal.3") {
+				actions.editSpace(space)
+			}
+		]
+		if !store.children(of: space.todayContainerID).isEmpty {
+			edit.append(
+				IconMenuItem(title: "Clear Today", symbol: "wind", destructive: true) {
+					store.clearToday(space.id)
+				})
+		}
+		return [make, edit]
 	}
 
 	@ViewBuilder
@@ -616,20 +630,45 @@ struct SpaceHeader: View {
 		}
 		.buttonStyle(.plain)
 		.onHover { hover = $0 }
-		.contextMenu {
-			if hasPinned {
-				Button(collapsed ? "Expand Pinned Tabs" : "Collapse Pinned Tabs", action: toggle)
-				Divider()
+		.iconMenu(palette: palette) {
+			var make = [
+				IconMenuItem(title: "New Folder", symbol: "folder.badge.plus") {
+					actions.performAction("newFolder")
+				}
+			]
+			if store.liveFolder(.github, inSpace: space.id) == nil {
+				make.append(
+					IconMenuItem(title: "New GitHub Live Folder", symbol: "arrow.triangle.pull") {
+						actions.performAction("newGitHubLiveFolder")
+					})
 			}
-			Button("Edit Space…") { actions.editSpace(space) }
-			Button("New Folder") { actions.performAction("newFolder") }
-			Button("New GitHub Live Folder") { actions.performAction("newGitHubLiveFolder") }
-				.disabled(store.liveFolder(.github, inSpace: space.id) != nil)
-			Divider()
-			Button("Clear Today") { store.clearToday(space.id) }
-			Divider()
-			Button("New Space…") { actions.editSpace(nil) }
-			Button("Delete Space…") { actions.performAction("deleteSpace") }
+			var view = [
+				IconMenuItem(title: "Edit Space", symbol: "slider.horizontal.3") {
+					actions.editSpace(space)
+				}
+			]
+			if hasPinned {
+				view.insert(
+					IconMenuItem(
+						title: collapsed ? "Expand Pinned Tabs" : "Collapse Pinned Tabs",
+						symbol: collapsed ? "chevron.down" : "chevron.up", action: toggle), at: 0)
+			}
+			return [
+				view, make,
+				[
+					IconMenuItem(title: "New Space", symbol: "plus.square.on.square") {
+						actions.editSpace(nil)
+					}
+				],
+				[
+					IconMenuItem(title: "Clear Today", symbol: "wind", destructive: true) {
+						store.clearToday(space.id)
+					},
+					IconMenuItem(title: "Delete Space", symbol: "trash", destructive: true) {
+						actions.performAction("deleteSpace")
+					},
+				],
+			]
 		}
 	}
 }
