@@ -327,7 +327,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, BrowserM
 			palette: palette, pager: SpacePager(store: store, ui: sidebarUI))
 		shell.placeholderHost.rootView = AnyView(EmptyContentView(space: space))
 		shell.isDarkTheme = palette.isDark
-		window?.appearance = NSAppearance(named: palette.isDark ? .darkAqua : .aqua)
+		// The window keeps the system appearance (sheets, menus, the page chrome); only the
+		// sidebar takes the space's, so a light space in a dark window tints just its column.
+		window?.appearance = nil
+		shell.sidebarHost.appearance = NSAppearance(named: palette.isDark ? .darkAqua : .aqua)
 		// Vibrant themes see through to the desktop like Arc; others are opaque.
 		shell.vibrancy.isHidden = !palette.vibrant
 		shell.vibrancyLift.isHidden = !palette.vibrant

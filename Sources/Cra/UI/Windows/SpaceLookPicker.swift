@@ -139,10 +139,11 @@ struct SpaceLookPicker: View {
 	// MARK: Colours
 
 	/// Picked colours are stored darker for a dark space and lighter for a light one, so
-	/// the same spot in the field reads well either way.
+	/// the same spot in the field reads well either way. Dark stays at 55% so a colour keeps
+	/// its hue instead of going muddy.
 	private var brightness: Double {
 		switch theme.appearance {
-		case "dark": return 0.36
+		case "dark": return 0.55
 		case "light": return 0.93
 		default: return 0.85
 		}

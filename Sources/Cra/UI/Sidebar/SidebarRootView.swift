@@ -502,7 +502,7 @@ struct SpaceSectionView: View {
 					SidebarItemView(item: item, depth: 0, palette: palette, section: .pinned)
 						.id(item.id)
 				}
-				// With nothing pinned the list is 8pt tall; a drag opens a real target.
+				// With nothing pinned the list is 4pt tall; a drag opens a real target.
 				// Not when collapsed: the placeholder would claim an empty list and
 				// open under the pointer, taking drops meant for the top of Today.
 				if store.children(of: space.pinnedContainerID).isEmpty && ui.listDrop != nil {
@@ -515,7 +515,7 @@ struct SpaceSectionView: View {
 				ui.rowFrames[space.pinnedContainerID] = $0
 			}
 			.padding(.horizontal, 10)
-			.frame(minHeight: 8)
+			.frame(minHeight: 4)
 			.background(
 				RoundedRectangle(cornerRadius: 10).fill(
 					dropSection == .pinned && !pinnedItems.isEmpty ? palette.hoverFill : .clear
@@ -524,7 +524,6 @@ struct SpaceSectionView: View {
 			// Divider between pinned and today; "Clear" shows on hover.
 			HStack {
 				Rectangle().fill(palette.separator).frame(height: 1)
-					.opacity(todayItems.isEmpty ? 0 : 1)
 				if hoverDivider && !todayItems.isEmpty {
 					Button("Clear") { store.clearToday(space.id) }
 						.buttonStyle(.plain)
@@ -534,7 +533,7 @@ struct SpaceSectionView: View {
 						.transition(.opacity)
 				}
 			}
-			.frame(height: 18)
+			.frame(height: 12)
 			.padding(.horizontal, 20)
 			.contentShape(Rectangle())
 			.onHover { hoverDivider = $0 }
